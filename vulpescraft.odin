@@ -70,7 +70,12 @@ main :: proc() {
 	sdl2.GL_SetAttribute(sdl2.GLattr.CONTEXT_PROFILE_MASK, i32(sdl2.GLprofile.CORE))
 
 
-	window := sdl2.CreateWindow("testando se muda alguma coisa", sdl2.WINDOWPOS_CENTERED, sdl2.WINDOWPOS_CENTERED, screenWidth, screenHeight, sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
+	window := sdl2.CreateWindow(
+		"testando se muda alguma coisa", 
+		sdl2.WINDOWPOS_CENTERED, 
+		sdl2.WINDOWPOS_CENTERED, 
+		screenWidth, screenHeight, 
+		sdl2.WINDOW_RESIZABLE | sdl2.WINDOW_OPENGL)
 	if window == nil {
 		skeewb.console_log(.ERROR, "could not create a window sdl error: %s", sdl2.GetError())
 	}
