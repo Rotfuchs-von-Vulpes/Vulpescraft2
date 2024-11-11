@@ -90,28 +90,28 @@ isSideExposed :: proc(primers: ^Primers, pos: BlockPos, offset: Pos) -> bool {
     chunkZOffset := 0
 
     if offset.x < 0 && pos.x == 0 {
-        sidePos = BlockPos{31, sidePos.y, sidePos.z}
+        sidePos = BlockPos{15, sidePos.y, sidePos.z}
         x = 0
         chunkXOffset = -1
-    } else if offset.x > 0 && pos.x == 31 {
+    } else if offset.x > 0 && pos.x == 15 {
         sidePos = BlockPos{0, sidePos.y, sidePos.z}
         x = 0
         chunkXOffset = 1
     }
     if offset.y < 0 && pos.y == 0 {
-        sidePos = BlockPos{sidePos.x, 31, sidePos.z}
+        sidePos = BlockPos{sidePos.x, 15, sidePos.z}
         y = 0
         chunkYOffset = -1
-    } else if offset.y > 0 && pos.y == 31 {
+    } else if offset.y > 0 && pos.y == 15 {
         sidePos = BlockPos{sidePos.x, 0, sidePos.z}
         y = 0
         chunkYOffset = 1
     }
     if offset.z < 0 && pos.z == 0 {
         z = 0
-        sidePos = BlockPos{sidePos.x, sidePos.y, 31}
+        sidePos = BlockPos{sidePos.x, sidePos.y, 15}
         chunkZOffset = -1
-    } else if offset.z > 0 && pos.z == 31 {
+    } else if offset.z > 0 && pos.z == 15 {
         z = 0
         sidePos = BlockPos{sidePos.x, sidePos.y, 0}
         chunkZOffset = 1
@@ -137,11 +137,11 @@ hasSideExposed :: proc(primers: ^Primers, pos: BlockPos) -> bool {
 filterCubes :: proc(primers: ^Primers) -> [dynamic]Cube {
     filtered := [dynamic]Cube{}
 
-    for i in 0..<32 {
-        for j in 0..< 32 {
-            for k in 0..< 32 {
+    for i in 0..<16 {
+        for j in 0..<16 {
+            for k in 0..<16 {
                 pos := BlockPos{u8(i), u8(j), u8(k)}
-                id := primers[1][1][1].primer[pos.x][pos.y][pos.z].id
+                id := primers[1][1][1].primer[i][j][k].id
 
                 if id == 0 {continue}
 
@@ -202,27 +202,27 @@ getBlockPos :: proc(primers: Primers, pos: Pos) -> (^world.Chunk, BlockPos, bool
     chunkZOffset := 0
 
     if pos.x < 0 {
-        sidePos = {sidePos.x + 32, sidePos.y, sidePos.z}
+        sidePos = {sidePos.x + 16, sidePos.y, sidePos.z}
         chunkXOffset = -1
     }
-    if pos.x > 31 {
-        sidePos = {sidePos.x - 32, sidePos.y, sidePos.z}
+    if pos.x > 15 {
+        sidePos = {sidePos.x - 16, sidePos.y, sidePos.z}
         chunkXOffset = 1
     }
     if pos.y < 0 {
-        sidePos = {sidePos.x, sidePos.y + 32, sidePos.z}
+        sidePos = {sidePos.x, sidePos.y + 16, sidePos.z}
         chunkYOffset = -1
     }
-    if pos.y > 31 {
-        sidePos = {sidePos.x, sidePos.y - 32, sidePos.z}
+    if pos.y > 15 {
+        sidePos = {sidePos.x, sidePos.y - 16, sidePos.z}
         chunkYOffset = 1
     }
     if pos.z < 0 {
-        sidePos = {sidePos.x, sidePos.y, sidePos.z + 32}
+        sidePos = {sidePos.x, sidePos.y, sidePos.z + 16}
         chunkZOffset = -1
     }
-    if pos.z > 31 {
-        sidePos = {sidePos.x, sidePos.y, sidePos.z - 32}
+    if pos.z > 15 {
+        sidePos = {sidePos.x, sidePos.y, sidePos.z - 16}
         chunkZOffset = 1
     }
 

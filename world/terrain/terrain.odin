@@ -52,8 +52,8 @@ getNoised :: proc(n: Noise, x, z: f64) -> f32 {
 }
 
 getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
-    posX := f64(x) + f64(i) / 32
-    posZ := f64(z) + f64(j) / 32
+    posX := f64(x) + f64(i) / 16
+    posZ := f64(z) + f64(j) / 16
     continent := getNoised(continentalness, posX, posZ)
     eroding := getNoised(erosion, posX, posZ)
     peaking := getNoised(peaksAndValleys, posX, posZ)
@@ -65,8 +65,8 @@ getTerrain :: proc(x, z: i32, i, j: int) -> i32 {
 getHeightMap :: proc(x, z: i32) -> HeightMap {
     height: HeightMap
 
-    for i in 0..<32 {
-        for j in 0..<32 {
+    for i in 0..<16 {
+        for j in 0..<16 {
             height[i][j] = getTerrain(x, z, i, j)
         }
     }

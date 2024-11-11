@@ -265,9 +265,9 @@ main :: proc() {
 		}
 		last = time.tick_now()
 		
-		chunkX := i32(math.floor(playerCamera.pos.x / 32))
-		chunkY := i32(math.floor(playerCamera.pos.y / 32))
-		chunkZ := i32(math.floor(playerCamera.pos.z / 32))
+		chunkX := i32(math.floor(playerCamera.pos.x / 16))
+		chunkY := i32(math.floor(playerCamera.pos.y / 16))
+		chunkZ := i32(math.floor(playerCamera.pos.z / 16))
 		moved := false
 
 		if chunkX != lastChunkX {

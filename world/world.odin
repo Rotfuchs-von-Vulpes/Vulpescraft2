@@ -16,7 +16,7 @@ blockState :: struct {
     id: u32,
     light: [2]u8,
 }
-Primer :: [32][32][32]blockState
+Primer :: [16][16][16]blockState
 
 Direction :: enum {Up, Bottom, North, South, East, West}
 FaceSet :: bit_set[Direction]
@@ -57,27 +57,27 @@ getNewChunk :: proc(chunk: ^Chunk, id: int, x, y, z: i32) {
 }
 
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
-    for i in 0..<32 {
-        for j in 0..<32 {
+    for i in 0..<16 {
+        for j in 0..<16 {
             height := int(heightMap[i][j])
-            localHeight := height - int(chunk.pos.y) * 32
+            localHeight := height - int(chunk.pos.y) * 16
             topHeight := min(height, 15)
-            for k in 0..<32 {
+            for k in 0..<16 {
                 chunk.primer[i][k][j].light = {0, 0}
                 if k >= localHeight {
                     if k == 0 {
                         chunk.opened += {.Bottom}
-                    } else if k == 31 {
+                    } else if k == 15 {
                         chunk.opened += {.Up}
                     }
                     if i == 0 {
                         chunk.opened += {.West}
-                    } else if i == 31 {
+                    } else if i == 15 {
                         chunk.opened += {.East}
                     }
                      if j == 0 {
                         chunk.opened += {.South}
-                    } else if j == 31 {
+                    } else if j == 15 {
                         chunk.opened += {.North}
                     }
                 }
@@ -112,8 +112,8 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
 setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
     x := x; y := y; z := z; c := c
 
-    for x >= 32 {
-        x -= 32
+    for x >= 16 {
+        x -= 16
         side := c.sides[.East]
         if side == nil {
             side = eval(c.pos.x + 1, c.pos.y, c.pos.z)
@@ -126,7 +126,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         c = side
     }
     for x < 0 {
-        x += 32
+        x += 16
         side := c.sides[.West]
         if side == nil {
             side = eval(c.pos.x - 1, c.pos.y, c.pos.z)
@@ -138,8 +138,8 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         }
         c = side
     }
-    for y >= 32 {
-        y -= 32
+    for y >= 16 {
+        y -= 16
         side := c.sides[.Up]
         if side == nil {
             side = eval(c.pos.x, c.pos.y + 1, c.pos.z)
@@ -153,7 +153,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         c = side
     }
     for y < 0 {
-        y += 32
+        y += 16
         side := c.sides[.Bottom]
         if side == nil {
             side = eval(c.pos.x, c.pos.y - 1, c.pos.z)
@@ -165,8 +165,8 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         }
         c = side
     }
-    for z >= 32 {
-        z -= 32
+    for z >= 16 {
+        z -= 16
         side := c.sides[.North]
         if side == nil {
             side = eval(c.pos.x, c.pos.y, c.pos.z + 1)
@@ -179,7 +179,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         c = side
     }
     for z < 0 {
-        z += 32
+        z += 16
         side := c.sides[.South]
         if side == nil {
             side = eval(c.pos.x, c.pos.y, c.pos.z - 1)
@@ -245,12 +245,12 @@ populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk) {
         n := int(math.floor(3 * rand.float32(rnd) + 3))
         
         for i in 0..<n {
-            x0 := u32(math.floor(32 * rand.float32(rnd)))
-            z0 := u32(math.floor(32 * rand.float32(rnd)))
+            x0 := u32(math.floor(16 * rand.float32(rnd)))
+            z0 := u32(math.floor(16 * rand.float32(rnd)))
         
             toPlace := false
             y0: u32 = 0
-            for j in 0..<32 {
+            for j in 0..<16 {
                 y0 = u32(j)
                 if c.primer[x0][j][z0].id == 3 {
                     toPlace = true
@@ -273,10 +273,10 @@ iluminate :: proc(chunk: ^Chunk) {
         lm: [2]i8,
     }
 
-    for x in 0..<32 {
-        for z in 0..<32 {
+    for x in 0..<16 {
+        for z in 0..<16 {
             findSolidBlock := false
-            for y: i32 = 31; y >= 0; y -= 1 {
+            for y: i32 = 15; y >= 0; y -= 1 {
                 id := chunk.primer[x][y][z].id
                 transparentBlock := id == 7 || id == 8
 
@@ -292,7 +292,7 @@ iluminate :: proc(chunk: ^Chunk) {
                     }
                 } else if transparentBlock {
                     chunk.primer[x][y][z].light.x = 0
-                    chunk.primer[x][y][z].light.y = y < 31 ? clamp(chunk.primer[x][y + 1][z].light.y - 1, 0, 15) : 0
+                    chunk.primer[x][y][z].light.y = y < 15 ? clamp(chunk.primer[x][y + 1][z].light.y - 1, 0, 15) : 0
                 } else {
                     chunk.primer[x][y][z].light.x = 0
                     chunk.primer[x][y][z].light.y = 15
@@ -301,13 +301,13 @@ iluminate :: proc(chunk: ^Chunk) {
         }
     }
 
-    noWorkDoneCache := [32]bool{} 
+    noWorkDoneCache := [16]bool{} 
     for i in 0..<16 {
-        for y in 0..<32 {
+        for y in 0..<16 {
             if noWorkDoneCache[y] {continue}
             noWorkDone := true
-            for x in 0..<32 {
-                for z in 0..<32 {
+            for x in 0..<16 {
+                for z in 0..<16 {
                     state := &chunk.primer[x][y][z]
 
                     if state.id != 0 {continue}
@@ -316,11 +316,11 @@ iluminate :: proc(chunk: ^Chunk) {
                     noWorkDone = false
 
                     nx := x == 0  ? [2]u8{0, 0} : chunk.primer[x - 1][y][z].light
-                    px := x == 31 ? [2]u8{0, 0} : chunk.primer[x + 1][y][z].light
+                    px := x == 15 ? [2]u8{0, 0} : chunk.primer[x + 1][y][z].light
                     ny := y == 0  ? [2]u8{0, 0} : chunk.primer[x][y - 1][z].light
-                    py := y == 31 ? [2]u8{0, 0} : chunk.primer[x][y + 1][z].light
+                    py := y == 15 ? [2]u8{0, 0} : chunk.primer[x][y + 1][z].light
                     nz := z == 0  ? [2]u8{0, 0} : chunk.primer[x][y][z - 1].light
-                    pz := z == 31 ? [2]u8{0, 0} : chunk.primer[x][y][z + 1].light
+                    pz := z == 15 ? [2]u8{0, 0} : chunk.primer[x][y][z + 1].light
 
                     blockLight: u8 = 0;
                     if state.light.x <= 16 {
@@ -341,57 +341,6 @@ iluminate :: proc(chunk: ^Chunk) {
             noWorkDoneCache[y] = noWorkDone
         }
     }
-
-    /*
-    for worm in worms {
-        tested[worm.pos.x][worm.pos.y][worm.pos.z] = true
-        if worm.pos.y > 0 {
-            if chunk.primer[worm.pos.x][worm.pos.y - 1][worm.pos.z].id == 0 {
-                append(&worms, light{{worm.pos.x, worm.pos.y - 1, worm.pos.z}, worm.lm})
-            }
-        }
-    }
-    
-    for worm in worms {
-        pos := worm.pos
-        tested[pos.x][pos.y][pos.z] = true
-        chunk.primer[pos.x][pos.y][pos.z].light = {u8(worm.lm.x), u8(worm.lm.y)}
-        /*
-        if pos.x > 0 && !tested[pos.x - 1][pos.y][pos.z] {
-            id := chunk.primer[pos.x - 1][pos.y][pos.z].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x - 1, pos.y, pos.z}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        } else if pos.x < 31 && !tested[pos.x + 1][pos.y][pos.z] {
-            id := chunk.primer[pos.x + 1][pos.y][pos.z].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x + 1, pos.y, pos.z}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        }
-        if pos.y > 0 && !tested[pos.x][pos.y - 1][pos.z] {
-            id := chunk.primer[pos.x][pos.y - 1][pos.z].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x, pos.y - 1, pos.z}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        } else if pos.y < 31 && !tested[pos.x][pos.y + 1][pos.z] {
-            id := chunk.primer[pos.x][pos.y + 1][pos.z].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x, pos.y + 1, pos.z}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        }
-        if pos.z > 0 && !tested[pos.x][pos.y][pos.z - 1] {
-            id := chunk.primer[pos.x][pos.y][pos.z - 1].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x, pos.y, pos.z - 1}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        } else if pos.z < 31 && !tested[pos.x][pos.y][pos.z + 1] {
-            id := chunk.primer[pos.x][pos.y][pos.z + 1].id
-            if id == 0 || id == 8 || id == 7 {
-                append(&worms, light{{pos.x, pos.y, pos.z + 1}, {clamp(worm.lm.x - 1, 0, 15), clamp(worm.lm.y - 1, 0, 15)}})
-            }
-        }
-            */
-    }*/
 
     chunk.level = 3
 }
@@ -419,8 +368,6 @@ addWorm :: proc(pos, center: iVec3, history: ^map[iVec3]bool) -> bool {
 
     if pos in history {return false}
 
-    //skeewb.console_log(.INFO, "added: %d, %d, %d", pos.x, pos.y, pos.z)
-
     history[pos] = true
 
     return true
@@ -428,8 +375,6 @@ addWorm :: proc(pos, center: iVec3, history: ^map[iVec3]bool) -> bool {
 
 peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
     chunksToView := [dynamic]^Chunk{}
-    //chunks := [dynamic]Chunk{}
-    //defer delete(chunks)
     chunksToSide := [dynamic]^Chunk{}
     defer delete(chunksToSide)
     chunksToPopulate := [dynamic]^Chunk{}
@@ -447,8 +392,6 @@ peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
         worm := worms[i]
         c := eval(worm.x, worm.y, worm.z)
         append(&chunksToSide, c)
-        //skeewb.console_log(.INFO, "%d", c.pos.y)
-        // if c.level == 0 {setBlocksChunk(c, terrain.getHeightMap(worm.x, worm.z))}
         if c.level == 1 && abs(worm.x - x) < VIEW_DISTANCE + 1 && abs(worm.y - y) < VIEW_DISTANCE + 1 && abs(worm.z - z) < VIEW_DISTANCE + 1 {append(&chunksToPopulate, c)}
 
         if .West in c.opened && addWorm(worm + {-1, 0, 0}, {x, y, z}, &history) {
@@ -486,17 +429,17 @@ peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
 
 getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
-        i32(math.floor(f32(pos.x) / 32)),
-        i32(math.floor(f32(pos.y) / 32)),
-        i32(math.floor(f32(pos.z) / 32))
+        i32(math.floor(f32(pos.x) / 16)),
+        i32(math.floor(f32(pos.y) / 16)),
+        i32(math.floor(f32(pos.z) / 16))
     }
 
     chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z)
 
     iPos: iVec3
-    iPos.x = pos.x %% 32
-    iPos.y = pos.y %% 32
-    iPos.z = pos.z %% 32
+    iPos.x = pos.x %% 16
+    iPos.y = pos.y %% 16
+    iPos.z = pos.z %% 16
 
     return chunk, iPos
 }
@@ -574,19 +517,19 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
     offsetY: i32 = 0
     offsetZ: i32 = 0
 
-    if pos.x >= 16 {
+    if pos.x >= 8 {
         offsetX += 1
     } else {
         offsetX -= 1
     }
 
-    if pos.y >= 16 {
+    if pos.y >= 8 {
         offsetY += 1
     } else {
         offsetY -= 1
     }
 
-    if pos.z >= 16 {
+    if pos.z >= 8 {
         offsetZ += 1
     } else {
         offsetZ -= 1
@@ -618,17 +561,17 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk.primer[pos.x][pos.y][pos.z].id = 0
     if pos.x == 0 {
         chunk.opened += {.West}
-    } else if pos.x == 31 {
+    } else if pos.x == 15 {
         chunk.opened += {.East}
     }
     if pos.y == 0 {
         chunk.opened += {.Bottom}
-    } else if pos.y == 31 {
+    } else if pos.y == 15 {
         chunk.opened += {.Up}
     }
     if pos.z == 0 {
         chunk.opened += {.South}
-    } else if pos.z == 31 {
+    } else if pos.z == 15 {
         chunk.opened += {.North}
     }
 
@@ -645,17 +588,17 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk.primer[pos.x][pos.y][pos.z].id = 5
     if pos.x == 0 {
         chunk.opened += {.West}
-    } else if pos.x == 31 {
+    } else if pos.x == 15 {
         chunk.opened += {.East}
     }
     if pos.y == 0 {
         chunk.opened += {.Bottom}
-    } else if pos.y == 31 {
+    } else if pos.y == 15 {
         chunk.opened += {.Up}
     }
     if pos.z == 0 {
         chunk.opened += {.South}
-    } else if pos.z == 31 {
+    } else if pos.z == 15 {
         chunk.opened += {.North}
     }
     

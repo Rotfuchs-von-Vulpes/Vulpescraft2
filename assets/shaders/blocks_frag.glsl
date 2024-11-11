@@ -82,7 +82,7 @@ void main()
 
     vec3 diffuse = CalculateLighting(albedo.rgb, Normal, Lightmap, gl_FragCoord.xyz);
 
-    float fragDist = length(Pos) / 6;
+    float fragDist = length(Pos) / 3;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 

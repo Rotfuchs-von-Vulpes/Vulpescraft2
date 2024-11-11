@@ -61,7 +61,7 @@ vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragC
 
 void main()
 {
-    float fragDist = ViewDist / 6;
+    float fragDist = ViewDist / 3;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 

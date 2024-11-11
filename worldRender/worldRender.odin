@@ -110,8 +110,8 @@ frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [d
 
 	PV := camera.proj * camera.view
 	for chunk in chunks {
-		minC := 32 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
-		maxC := minC + vec3{32, 32, 32}
+		minC := 16 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
+		maxC := minC + vec3{16, 16, 16}
 		
 		if testAabb(PV, minC, maxC) {append(&chunksBuffers, chunk)}
 	}

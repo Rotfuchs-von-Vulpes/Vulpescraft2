@@ -60,7 +60,7 @@ drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Re
 	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
 	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)
 	for chunk in chunks {
-		pos := vec3{f32(chunk.x) * 32 - camera.pos.x, f32(chunk.y) * 32 - camera.pos.y, f32(chunk.z) * 32 - camera.pos.z}
+		pos := vec3{f32(chunk.x) * 16 - camera.pos.x, f32(chunk.y) * 16 - camera.pos.y, f32(chunk.z) * 16 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
 		modelView := camera.view * model
 		// inverseModelView := glm.inverse_mat4(modelView)
