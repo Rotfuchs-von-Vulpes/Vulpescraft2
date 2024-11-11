@@ -100,11 +100,15 @@ main :: proc() {
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	blockRender := worldRender.Render{{}, 0, 0}
+	waterRender := worldRender.Render{{}, 0, 0}
 	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 
-	worldRender.setupDrawing(&blockRender)
+	worldRender.setupBlockDrawing(&blockRender)
+	worldRender.setupWaterDrawing(&waterRender)
+
+	//world.start()
 
 	// tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
 	// defer delete(tmp)
@@ -131,6 +135,14 @@ main :: proc() {
 	toBehind := false
 	toRight := false
 	toLeft := false
+
+	// if (gl.DebugMessageCallback != nil) {
+	// 	gl.Enable(gl.DEBUG_OUTPUT);
+	// 	gl.Enable(gl.DEBUG_OUTPUT_SYNCHRONOUS);
+	// 	gl.DebugMessageCallback(DebugCallback, nil);
+	
+	// 	skeewb.console_log(.INFO, "OpenGL: Enabled Debug Message Callback");
+	// }
 
 	loop: for {
 		tracy.FrameMark()
@@ -286,8 +298,9 @@ main :: proc() {
 		gl.UseProgram(sunRender.program)
 		sky.drawSun(&playerCamera, sunRender, deltaTime)
 		gl.Enable(gl.DEPTH_TEST)
-		gl.UseProgram(blockRender.program)
-		worldRender.drawChunks(chunks, &playerCamera, blockRender)
+		//gl.UseProgram(blockRender.program)
+		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
+		worldRender.drawWater(chunks, &playerCamera, waterRender)
 		
 		gl.Viewport(0, 0, screenWidth, screenHeight)
 		gl.UseProgram(fboRender.program)
@@ -317,6 +330,9 @@ main :: proc() {
 	for key, value in blockRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in waterRender.uniforms {
+		delete(value.name)
+	}
 	for key, value in fboRender.uniforms {
 		delete(value.name)
 	}
@@ -327,18 +343,16 @@ main :: proc() {
 		delete(value.name)
 	}
 	delete(blockRender.uniforms)
+	delete(waterRender.uniforms)
 	delete(fboRender.uniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
+	gl.DeleteProgram(waterRender.program)
 	gl.DeleteProgram(fboRender.program)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
-	for &chunk in chunks {
-		gl.DeleteBuffers(1, &chunk.VBO)
-		gl.DeleteBuffers(1, &chunk.EBO)
-	}
 	delete(allChunks)
 	delete(chunks)
 	

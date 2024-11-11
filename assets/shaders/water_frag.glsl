@@ -1,14 +1,10 @@
 #version 330 core
 
 out vec4 fragColor;
-in vec3 Pos;
+in float ViewDist;
 in vec3 Normal;
-in vec2 TexCoords;
-in float Occlusion;
-in float TextureID;
-in vec2 Lightmap;
+in vec3 ViewPos;
 
-uniform sampler2DArray textures;
 uniform vec3 sunDirection;
 uniform vec3 skyColor;
 uniform vec3 fogColor;
@@ -63,28 +59,17 @@ vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragC
     return diffuse;
 }
 
-vec3 ACESFilm(vec3 rgb) {
-  rgb *= 0.6;
-  float a = 2.51;
-  float b = 0.03;
-  float c = 2.43;
-  float d = 0.59;
-  float e = 0.14;
-  return (rgb*(a*rgb+b))/(rgb*(c*rgb+d)+e);
-}
-
 void main()
 {
-    vec4 albedo = texture(textures,vec3(TexCoords, TextureID));
-    if (albedo.a < 0.5) discard;
-    float occluse = 0.25 * Occlusion + 0.25;
-    albedo.rgb = pow(ACESFilm(albedo.rgb), vec3(1.0 / 2.2)) * occluse;
-
-    vec3 diffuse = CalculateLighting(albedo.rgb, Normal, Lightmap, gl_FragCoord.xyz);
-
-    float fragDist = length(Pos) / 6;
+    float fragDist = ViewDist / 6;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
-    fragColor = vec4(mix(diffuse, fogColor, fogFactor), albedo.a);
+    vec3 albedo = vec3(0.061, 0.16, 0.221);
+    vec3 diffuse = CalculateLighting(albedo, Normal, vec2(0, 1), gl_FragCoord.xyz);
+    vec3 color = mix(diffuse, fogColor, fogFactor);
+    
+    float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
+
+    fragColor = vec4(color, clamp(fresnel, 0.75, 1.0));
 }

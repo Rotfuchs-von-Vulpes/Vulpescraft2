@@ -5,12 +5,14 @@ layout(location=1)in vec3 aNormal;
 layout(location=2)in vec2 aTexCoords;
 layout(location=3)in float aOcclusion;
 layout(location=4)in float aTextureID;
+layout(location=5)in vec2 aLightmap;
 
 out vec3 Pos;
 out vec3 Normal;
 out vec2 TexCoords;
 out float Occlusion;
 out float TextureID;
+out vec2 Lightmap;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -23,5 +25,6 @@ void main() {
     TexCoords = aTexCoords;
     Occlusion = aOcclusion;
     TextureID = aTextureID;
+    Lightmap = aLightmap / 15;
 	gl_Position = projection * view * vec4(FragPos, 1.0);
 }
