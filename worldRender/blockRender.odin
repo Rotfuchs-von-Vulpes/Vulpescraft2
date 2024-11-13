@@ -113,40 +113,11 @@ drawBlocks :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: R
 	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
 	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)
 	for chunk in chunks {
-		pos := vec3{f32(chunk.x) * 16 - camera.pos.x, f32(chunk.y) * 16 - camera.pos.y, f32(chunk.z) * 16 - camera.pos.z}
+		pos := vec3{f32(chunk.pos.x) * 16 - camera.pos.x, f32(chunk.pos.y) * 16 - camera.pos.y, f32(chunk.pos.z) * 16 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 
 		gl.BindVertexArray(chunk.blockBuffer.VAO)
-		if .North in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.North][0]
-			end := chunk.data.blocks.ranges[.North][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
-		if .South in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.South][0]
-			end := chunk.data.blocks.ranges[.South][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
-		if .East in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.East][0]
-			end := chunk.data.blocks.ranges[.East][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
-		if .West in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.West][0]
-			end := chunk.data.blocks.ranges[.West][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
-		if .Up in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.Up][0]
-			end := chunk.data.blocks.ranges[.Up][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
-		if .Bottom in chunk.faceSet {
-			start := chunk.data.blocks.ranges[.Bottom][0]
-			end := chunk.data.blocks.ranges[.Bottom][1]
-			gl.DrawElements(gl.TRIANGLES, i32(end - start), gl.UNSIGNED_INT, (rawptr)(uintptr(start) * size_of(u32)))
-		}
+		gl.DrawElements(gl.TRIANGLES, chunk.data.blocks.length, gl.UNSIGNED_INT, nil)
 	}
 }

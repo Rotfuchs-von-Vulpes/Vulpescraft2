@@ -26,7 +26,7 @@ Buffers :: struct{
 }
 
 ChunkBuffer :: struct{
-    x, y, z: i32,
+    pos: iVec3,
 	faceSet: mesh.FaceSet,
 	data: mesh.ChunkData,
 	blockBuffer: Buffers,
@@ -40,37 +40,46 @@ Render :: struct{
 }
 
 chunkMap := make(map[iVec3]ChunkBuffer)
+dataChunks := make(map[iVec3]mesh.ChunkData)
 
-setupChunk :: proc(chunk: ^world.Chunk) -> ChunkBuffer {
-    data := mesh.generateMesh(chunk)
-	defer delete(data.blocks.indices)
-	defer delete(data.blocks.vertices)
-	defer delete(data.water.indices)
-	defer delete(data.water.vertices)
-
+setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
 	blocksBuffer := setupBlocks(data)
 	waterBuffer := setupWater(data)
+	delete(data.blocks.indices)
+	delete(data.blocks.vertices)
+	delete(data.water.indices)
+	delete(data.water.vertices)
 
-    return ChunkBuffer{chunk.pos.x, chunk.pos.y, chunk.pos.z, {}, data, blocksBuffer, waterBuffer}
+    return ChunkBuffer{data.pos, {}, data, blocksBuffer, waterBuffer}
 }
 
-eval :: proc(chunk: ^world.Chunk) -> ChunkBuffer {
-    pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
+eval :: proc(data: mesh.ChunkData) -> ChunkBuffer {
+    pos := iVec3{data.pos.x, data.pos.y, data.pos.z}
     chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
-        chunkBuffer^ = setupChunk(chunk)
+        chunkBuffer^ = setupChunk(data)
     }
     return chunkBuffer^
 }
 
-setupManyChunks :: proc(chunks: [dynamic]^world.Chunk) -> [dynamic]ChunkBuffer {
-    chunksBuffers: [dynamic]ChunkBuffer
+generateManyMeshes :: proc(chunks: [dynamic]^world.Chunk, tempMap: ^map[iVec3]^world.Chunk) -> [dynamic]mesh.ChunkData {
+    chunksData: [dynamic]mesh.ChunkData
 
-    for _, idx in chunks {
-        append(&chunksBuffers, eval(chunks[idx]))
+    for &chunk in chunks {
+        append(&chunksData, mesh.generateMesh(chunk, tempMap))
     }
 
-    return chunksBuffers;
+    return chunksData
+}
+
+setupManyChunks :: proc(chunks: ^[dynamic]mesh.ChunkData) -> [dynamic]ChunkBuffer {
+    chunksBuffers: [dynamic]ChunkBuffer
+
+    for &chunk in chunks {
+        append(&chunksBuffers, eval(chunk))
+    }
+
+    return chunksBuffers
 }
 
 testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
@@ -94,23 +103,23 @@ frustumMove :: proc(chunks: ^[dynamic]ChunkBuffer, camera: ^util.Camera) {
 	for &chunk in chunks {
 		faces: mesh.FaceSet = {}
 
-		if chunk.x <= camera.chunk.x {faces = faces + {.East}}
-		if chunk.x >= camera.chunk.x {faces = faces + {.West}}
-		if chunk.y <= camera.chunk.y {faces = faces + {.Up}}
-		if chunk.y >= camera.chunk.y {faces = faces + {.Bottom}}
-		if chunk.z <= camera.chunk.z {faces = faces + {.North}}
-		if chunk.z >= camera.chunk.z {faces = faces + {.South}}
+		if chunk.pos.x <= camera.chunk.x {faces = faces + {.East}}
+		if chunk.pos.x >= camera.chunk.x {faces = faces + {.West}}
+		if chunk.pos.y <= camera.chunk.y {faces = faces + {.Up}}
+		if chunk.pos.y >= camera.chunk.y {faces = faces + {.Bottom}}
+		if chunk.pos.z <= camera.chunk.z {faces = faces + {.North}}
+		if chunk.pos.z >= camera.chunk.z {faces = faces + {.South}}
 
 		chunk.faceSet = faces
 	}
 }
 
-frustumCulling :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera) -> [dynamic]ChunkBuffer {
+frustumCulling :: proc(chunks: ^[dynamic]ChunkBuffer, camera: ^util.Camera) -> [dynamic]ChunkBuffer {
 	chunksBuffers: [dynamic]ChunkBuffer = {}
 
 	PV := camera.proj * camera.view
 	for chunk in chunks {
-		minC := 16 * vec3{f32(chunk.x), f32(chunk.y), f32(chunk.z)} - camera.pos
+		minC := 16 * vec3{f32(chunk.pos.x), f32(chunk.pos.y), f32(chunk.pos.z)} - camera.pos
 		maxC := minC + vec3{16, 16, 16}
 		
 		if testAabb(PV, minC, maxC) {append(&chunksBuffers, chunk)}

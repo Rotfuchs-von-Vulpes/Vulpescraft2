@@ -22,7 +22,6 @@ Direction :: enum {Up, Bottom, North, South, East, West}
 FaceSet :: bit_set[Direction]
 
 Chunk :: struct {
-    id: int,
     pos: iVec3,
     sides: [Direction]^Chunk,
     primer: Primer,
@@ -36,13 +35,12 @@ nodeMap := make(map[iVec3]int)
 blocked := make(map[iVec3]bool)
 populated := make(map[iVec3]bool)
 
-getNewChunk :: proc(chunk: ^Chunk, id: int, x, y, z: i32) {
+getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
     empty: blockState = {
         id = 0,
         light = {0, 0},
     }
 
-    chunk.id = id
     chunk.level = 0
     chunk.opened = {}
     chunk.pos = {x, y, z}
@@ -109,14 +107,14 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     chunk.level = 1
 }
 
-setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
+setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
     x := x; y := y; z := z; c := c
 
     for x >= 16 {
         x -= 16
         side := c.sides[.East]
         if side == nil {
-            side = eval(c.pos.x + 1, c.pos.y, c.pos.z)
+            side = eval(c.pos.x + 1, c.pos.y, c.pos.z, tempMap)
             c.sides[.East] = side
         }
         if .East not_in c.opened {
@@ -129,7 +127,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         x += 16
         side := c.sides[.West]
         if side == nil {
-            side = eval(c.pos.x - 1, c.pos.y, c.pos.z)
+            side = eval(c.pos.x - 1, c.pos.y, c.pos.z, tempMap)
             c.sides[.West] = side
         }
         if .West not_in c.opened {
@@ -142,9 +140,8 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         y -= 16
         side := c.sides[.Up]
         if side == nil {
-            side = eval(c.pos.x, c.pos.y + 1, c.pos.z)
+            side = eval(c.pos.x, c.pos.y + 1, c.pos.z, tempMap)
             c.sides[.Up] = side
-            //skeewb.console_log(.INFO, "ah, %s", .Up in c.opened ? "true" : "false")
         }
         if .Up not_in c.opened {
             append(chunks, side)
@@ -156,7 +153,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         y += 16
         side := c.sides[.Bottom]
         if side == nil {
-            side = eval(c.pos.x, c.pos.y - 1, c.pos.z)
+            side = eval(c.pos.x, c.pos.y - 1, c.pos.z, tempMap)
             c.sides[.Bottom] = side
         }
         if .Bottom not_in c.opened {
@@ -169,7 +166,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         z -= 16
         side := c.sides[.North]
         if side == nil {
-            side = eval(c.pos.x, c.pos.y, c.pos.z + 1)
+            side = eval(c.pos.x, c.pos.y, c.pos.z + 1, tempMap)
             c.sides[.North] = side
         }
         if .North not_in c.opened {
@@ -182,7 +179,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
         z += 16
         side := c.sides[.South]
         if side == nil {
-            side = eval(c.pos.x, c.pos.y, c.pos.z - 1)
+            side = eval(c.pos.x, c.pos.y, c.pos.z - 1, tempMap)
             c.sides[.South] = side
         }
         if .South not_in c.opened {
@@ -196,14 +193,14 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
     c.primer[x][y][z].light = {0, 0}
 }
 
-placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
-    setBlock(x, y, z, 2, c, chunks)
+placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
+    setBlock(x, y, z, 2, c, chunks, tempMap)
 
     for i := y + 1; i <= y + 5; i += 1 {
         if i - y == 2 {
-            setBlock(x, i, z, 9, c, chunks)
+            setBlock(x, i, z, 9, c, chunks, tempMap)
         } else {
-            setBlock(x, i, z, 6, c, chunks)
+            setBlock(x, i, z, 6, c, chunks, tempMap)
         }
     }
 
@@ -215,7 +212,7 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
 
                 if xx && zz || i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c, chunks);
+                setBlock(i, k, j, 7, c, chunks, tempMap);
             }
         }
     }
@@ -228,13 +225,13 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk) {
 
                 if xx && zz || k == y + 5 && i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c, chunks);
+                setBlock(i, k, j, 7, c, chunks, tempMap);
             }
         }
     }
 }
 
-populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk) {
+populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
     for c in popChunks {
         x := c.pos.x
         y := c.pos.y
@@ -259,7 +256,7 @@ populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk) {
             }
         
             if toPlace {
-                placeTree(i32(x0), i32(y0), i32(z0), c, chunks)
+                placeTree(i32(x0), i32(y0), i32(z0), c, chunks, tempMap)
             }
         }
 
@@ -267,7 +264,68 @@ populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk) {
     }
 }
 
-iluminate :: proc(chunk: ^Chunk) {
+getLumeBlock :: proc(x, y, z: int, c: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ^[2]u8 {
+    x := x; y := y; z := z; c := c
+
+    if x >= 16 {
+        x -= 16
+        side := c.sides[.East]
+        if side == nil {
+            side = eval(c.pos.x + 1, c.pos.y, c.pos.z, tempMap)
+            c.sides[.East] = side
+        }
+        c = side
+    }
+    if x < 0 {
+        x += 16
+        side := c.sides[.West]
+        if side == nil {
+            side = eval(c.pos.x - 1, c.pos.y, c.pos.z, tempMap)
+            c.sides[.West] = side
+        }
+        c = side
+    }
+    if y >= 16 {
+        y -= 16
+        side := c.sides[.Up]
+        if side == nil {
+            side = eval(c.pos.x, c.pos.y + 1, c.pos.z, tempMap)
+            c.sides[.Up] = side
+        }
+        c = side
+    }
+    if y < 0 {
+        y += 16
+        side := c.sides[.Bottom]
+        if side == nil {
+            side = eval(c.pos.x, c.pos.y - 1, c.pos.z, tempMap)
+            c.sides[.Bottom] = side
+        }
+        c = side
+    }
+    if z >= 16 {
+        z -= 16
+        side := c.sides[.North]
+        if side == nil {
+            side = eval(c.pos.x, c.pos.y, c.pos.z + 1, tempMap)
+            c.sides[.North] = side
+        }
+        c = side
+    }
+    if z < 0 {
+        z += 16
+        side := c.sides[.South]
+        if side == nil {
+            side = eval(c.pos.x, c.pos.y, c.pos.z - 1, tempMap)
+            c.sides[.South] = side
+        }
+        c = side
+    }
+
+    return &c.primer[x][y][z].light
+}
+
+iluminate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     light :: struct{
         pos: iVec3,
         lm: [2]i8,
@@ -315,12 +373,12 @@ iluminate :: proc(chunk: ^Chunk) {
 
                     noWorkDone = false
 
-                    nx := x == 0  ? [2]u8{0, 0} : chunk.primer[x - 1][y][z].light
-                    px := x == 15 ? [2]u8{0, 0} : chunk.primer[x + 1][y][z].light
-                    ny := y == 0  ? [2]u8{0, 0} : chunk.primer[x][y - 1][z].light
-                    py := y == 15 ? [2]u8{0, 0} : chunk.primer[x][y + 1][z].light
-                    nz := z == 0  ? [2]u8{0, 0} : chunk.primer[x][y][z - 1].light
-                    pz := z == 15 ? [2]u8{0, 0} : chunk.primer[x][y][z + 1].light
+                    nx := getLumeBlock(x - 1, y, z, chunk, tempMap)
+                    px := getLumeBlock(x + 1, y, z, chunk, tempMap)
+                    ny := getLumeBlock(x, y - 1, z, chunk, tempMap)
+                    py := getLumeBlock(x, y + 1, z, chunk, tempMap)
+                    nz := getLumeBlock(x, y, z - 1, chunk, tempMap)
+                    pz := getLumeBlock(x, y, z + 1, chunk, tempMap)
 
                     blockLight: u8 = 0;
                     if state.light.x <= 16 {
@@ -345,13 +403,13 @@ iluminate :: proc(chunk: ^Chunk) {
     chunk.level = 3
 }
 
-eval :: proc(x, y, z: i32) -> ^Chunk {
+eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
     pos := iVec3{x, y, z}
-    chunk, inserted, _ := util.map_force_get(&allChunks, pos)
+    chunk, inserted, _ := util.map_force_get(tempMap, pos)
     if inserted {
-        idx := len(allChunks)
+        // skeewb.console_log(.INFO, "%d", chunk^.primer[0][0][0].id)
         chunk^ = new(Chunk)
-        getNewChunk(chunk^, idx, x, y, z)
+        getNewChunk(chunk^, x, y, z)
         setBlocksChunk(chunk^, terrain.getHeightMap(x, z))
     }
     return chunk^
@@ -373,7 +431,7 @@ addWorm :: proc(pos, center: iVec3, history: ^map[iVec3]bool) -> bool {
     return true
 }
 
-peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
+peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     chunksToView := [dynamic]^Chunk{}
     chunksToSide := [dynamic]^Chunk{}
     defer delete(chunksToSide)
@@ -390,7 +448,11 @@ peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
 
     for i := 0; i < len(worms); i += 1 {
         worm := worms[i]
-        c := eval(worm.x, worm.y, worm.z)
+        c := eval(worm.x, worm.y, worm.z, tempMap)
+        if c == nil {
+            skeewb.console_log(.INFO, "bruh")
+            continue
+        }
         append(&chunksToSide, c)
         if c.level == 1 && abs(worm.x - x) < VIEW_DISTANCE + 1 && abs(worm.y - y) < VIEW_DISTANCE + 1 && abs(worm.z - z) < VIEW_DISTANCE + 1 {append(&chunksToPopulate, c)}
 
@@ -414,14 +476,17 @@ peak :: proc(x, y, z: i32) -> [dynamic]^Chunk {
         }
     }
 
-    populate(&chunksToPopulate, &chunksToSide)
+    populate(&chunksToPopulate, &chunksToSide, tempMap)
 
     for chunk in chunksToSide {
         dist := chunk.pos - iVec3{x, y, z}
         if abs(dist.x) < VIEW_DISTANCE && abs(dist.y) < VIEW_DISTANCE && abs(dist.z) < VIEW_DISTANCE {
-            iluminate(chunk)
             append(&chunksToView, chunk)
         }
+    }
+
+    for chunk in chunksToPopulate {
+        iluminate(chunk, tempMap)
     }
 
     return chunksToView
@@ -434,7 +499,7 @@ getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
         i32(math.floor(f32(pos.z) / 16))
     }
 
-    chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z)
+    chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
 
     iPos: iVec3
     iPos.x = pos.x %% 16
@@ -543,7 +608,7 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
                     chunk.pos.y + i32(j) * offsetY,
                     chunk.pos.z + i32(k) * offsetZ
                 }
-                chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z)
+                chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
 
                 append(&chunks, chunk)
             }
@@ -609,8 +674,8 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
 
 nuke :: proc() {
     delete(chunkMap)
-    for pos, chunk in allChunks {
-        free(chunk)
-    }
+    // for pos, chunk in allChunks {
+    //     free(chunk)
+    // }
     delete(allChunks)
 }

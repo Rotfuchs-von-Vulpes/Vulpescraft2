@@ -4,6 +4,8 @@ import "core:fmt"
 import "core:strings"
 import "core:time"
 import "core:mem"
+import "core:thread"
+import "core:sync/chan"
 import math "core:math/linalg"
 import glm "core:math/linalg/glsl"
 import "skeewb"
@@ -13,6 +15,7 @@ import gl "vendor:OpenGL"
 
 import "world"
 import "worldRender"
+import mesh "worldRender/meshGenerator"
 import "frameBuffer"
 import "util"
 import "sky"
@@ -23,11 +26,11 @@ screenWidth: i32 = 854
 screenHeight: i32 = 480
 
 playerCamera := util.Camera{
-	{1, 33, 1}, 
+	{14, 31, 14}, 
 	{0, 0, -1}, 
 	{0, 1, 0}, 
 	{1, 0, 0}, 
-	{0, 0, 0}, 
+	{0, 1, 0}, 
 	{2 * f32(screenWidth), 2 * f32(screenHeight)}, 
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
@@ -43,14 +46,36 @@ cameraMove :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 }
 
-reloadChunks :: proc() {
-	if allChunks != nil {delete(allChunks)}
-	if chunks != nil {delete(chunks)}
-	tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z)
-	defer delete(tmp)
-	allChunks = worldRender.setupManyChunks(tmp)
-	worldRender.frustumMove(&allChunks, &playerCamera)
-	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+meshes_chan: chan.Chan(mesh.ChunkData)
+// allChunksCopy: map[[3]i32]^world.Chunk
+// dataChunksCopy: map[[3]i32]mesh.ChunkData
+
+function :: proc(^thread.Thread) {
+	skeewb.console_log(.INFO, "isso veio de um thread!")
+	chunks := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, &world.allChunks)
+	defer delete(chunks)
+	chunksData := worldRender.generateManyMeshes(chunks, &world.allChunks)
+	defer delete(chunksData)
+	for &chunkData in chunksData {
+		chan.send(meshes_chan, chunkData)
+	}
+}
+
+toReload := false
+
+reloadChunks :: proc(previous: ^thread.Thread) -> ^thread.Thread {
+	if previous != nil {
+		if thread.is_done(previous) {
+			thread.destroy(previous)
+			toReload = false
+		} else {
+			toReload = true
+			return previous
+		}
+	}
+	t := thread.create(function)
+	thread.start(t)
+	return t
 }
 
 main :: proc() {
@@ -60,6 +85,10 @@ main :: proc() {
 	defer free(tracking_allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
+
+	chunksAllocator := runtime.heap_allocator()
+	err: runtime.Allocator_Error
+	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -125,7 +154,7 @@ main :: proc() {
 	sky.setupSun(&playerCamera, &sunRender)
 
 	worldRender.frustumMove(&allChunks, &playerCamera)
-	chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+	chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
 
 	lastTimeTicks := time.tick_now()
 	nbFrames := 0
@@ -144,13 +173,13 @@ main :: proc() {
 	// 	skeewb.console_log(.INFO, "OpenGL: Enabled Debug Message Callback");
 	// }
 
+	t := reloadChunks(nil)
 	loop: for {
 		tracy.FrameMark()
 		duration := time.tick_since(start_tick)
 		deltaTime := f32(time.duration_milliseconds(duration))
 
 		event: sdl2.Event
-			
 		for sdl2.PollEvent(&event) {
 			if event.type == .QUIT || event.type == .WINDOWEVENT && event.window.event == .CLOSE {
 				break loop
@@ -219,21 +248,21 @@ main :: proc() {
 				
 				playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 				if chunks != nil {delete(chunks)}
-				chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
 			} else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
 					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						reloadChunks()
+						t = reloadChunks(t)
 					}
 				} else if event.button.button == 3 {
 					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						reloadChunks()
+						t = reloadChunks(t)
 					}
 				}
 			}
@@ -261,7 +290,7 @@ main :: proc() {
 			scale = math.vector_normalize(scale) * cameraSpeed * f32(time.duration_milliseconds(time.tick_since(last)))
 			playerCamera.pos += scale;
 			if chunks != nil {delete(chunks)}
-			chunks = worldRender.frustumCulling(allChunks, &playerCamera)
+			chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
 		}
 		last = time.tick_now()
 		
@@ -286,7 +315,35 @@ main :: proc() {
 			moved = true
 		}
 
-		if moved {reloadChunks()}
+		if moved {t = reloadChunks(t)}
+
+		if toReload {t = reloadChunks(t)}
+		
+		{
+			tmp := [dynamic]mesh.ChunkData{}
+			defer delete(tmp)
+			done := false
+			for {
+				chunk, ok := chan.try_recv(meshes_chan)
+				if !ok {
+					//if t != nil {thread.destroy(t)}
+					break
+				}
+				done = true
+				append(&tmp, chunk)
+			}
+
+			if done {
+				if allChunks != nil {
+					delete(allChunks)
+				}
+				//if t != nil {thread.destroy(t)}
+				if chunks != nil {delete(chunks)}
+				allChunks = worldRender.setupManyChunks(&tmp)
+				worldRender.frustumMove(&allChunks, &playerCamera)
+				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
+			}
+		}
 
 		gl.UseProgram(fboRender.program)
 		gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
@@ -298,7 +355,6 @@ main :: proc() {
 		gl.UseProgram(sunRender.program)
 		sky.drawSun(&playerCamera, sunRender, deltaTime)
 		gl.Enable(gl.DEPTH_TEST)
-		//gl.UseProgram(blockRender.program)
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
 		worldRender.drawWater(chunks, &playerCamera, waterRender)
 		
@@ -317,6 +373,8 @@ main :: proc() {
 		}
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 	}
+	
+	if t != nil {thread.destroy(t)}
 	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)
@@ -353,6 +411,8 @@ main :: proc() {
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
+	// delete(allChunksCopy)
+	// delete(dataChunksCopy)
 	delete(allChunks)
 	delete(chunks)
 	
