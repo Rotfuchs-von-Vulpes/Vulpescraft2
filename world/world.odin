@@ -302,16 +302,6 @@ chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> bool {
     return chunks[chunkX + 1][chunkY + 1][chunkZ + 1] != nil
 }
 
-copy :: proc(bufferCopy, bufferIn: ^[16 * 3][16 * 3][16 * 3][2]u8) {
-    for i in 0..<(16 * 3) {
-        for j in 0..<(16 * 3) {
-            for k in 0..<(16 * 3) {
-                bufferCopy[i][j][k] = bufferIn[i][j][k]
-            }
-        }
-    }
-}
-
 sunlight :: proc(chunk: ^Chunk) {
     buffer: [16][16][16][2]u8
 
@@ -355,8 +345,7 @@ sunlight :: proc(chunk: ^Chunk) {
 
 iluminate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     chunkMatrix: [3][3][3]^Chunk
-    bufferWrite: [16 * 3][16 * 3][16 * 3][2]u8
-    bufferRead: [16 * 3][16 * 3][16 * 3][2]u8
+    buffer: [16 * 3][16 * 3][16 * 3][2]u8
     solidCache: [16 * 3][16 * 3][16 * 3]bool
 
     for i: i32 = -1; i <= 1; i += 1 {
@@ -369,57 +358,38 @@ iluminate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
 
     for x in -16..<32 {
         for z in -16..<32 {
-            foundGround := false
             for y := 31; y >= -16; y -= 1 {
                 block := getBlock(x, y, z, chunkMatrix)
                 id := block.id
-                transparent := id == 7 || id == 8
-                solid := id != 0 && !transparent
-                solidCache[x + 16][y + 16][z + 16] = solid
 
-                if solid {
-                    foundGround = true
-                }
+                solidCache[x + 16][y + 16][z + 16] = id != 0
 
-                emissive: u8 = 0
-                if id == 9 {emissive = 15}
-
-                if foundGround {
-                    bufferWrite[x + 16][y + 16][z + 16] = {emissive, 0}
-                } else if transparent {
-                    bufferWrite[x + 16][y + 16][z + 16].x = emissive
-                    bufferWrite[x + 16][y + 16][z + 16].y = y < 31 ? clamp(bufferWrite[x + 16][y + 16 + 1][z + 16].y - 1, 0, 15) : 0
-                } else {
-                    bufferWrite[x + 16][y + 16][z + 16].x = emissive
-                    bufferWrite[x + 16][y + 16][z + 16].y = y < 31 ? clamp(bufferWrite[x + 16][y + 16 + 1][z + 16].y, 0, 15) : 15
-                }
+                buffer[x + 16][y + 16][z + 16] = block.light
             }
         }
     }
 
-    bufferRead = bufferWrite
-    // noWorkDoneCache := [3 * 16]bool{} 
+    noWorkDoneCache := [3 * 16]bool{} 
     for i in 0..<16 {
-        bufferRead = bufferWrite
-        for y in -16..<32 {
-            // if noWorkDoneCache[y + 16] {continue}
-            // noWorkDone := true
-            for x in -16..<32 {
-                for z in -16..<32 {
-                    current := bufferRead[x + 16][y + 16][z + 16]
+        for y in -15..<31 {
+            if noWorkDoneCache[y + 16] {continue}
+            noWorkDone := true
+            for x in -15..<31 {
+                for z in -15..<31 {
+                    current := buffer[x + 16][y + 16][z + 16]
 
                     if current.x >= 15 && current.y >= 15 {continue}
 
                     if solidCache[x + 16][y + 16][z + 16] {continue}
 
-                    // noWorkDone = false
+                    noWorkDone = false
 
-                    nx := x > -16 ? bufferRead[x + 16 - 1][y + 16][z + 16] : {0, 0}
-                    px := x <  31 ? bufferRead[x + 16 + 1][y + 16][z + 16] : {0, 0}
-                    ny := y > -16 ? bufferRead[x + 16][y + 16 - 1][z + 16] : {0, 0}
-                    py := y <  31 ? bufferRead[x + 16][y + 16 + 1][z + 16] : {0, 0}
-                    nz := z > -16 ? bufferRead[x + 16][y + 16][z + 16 - 1] : {0, 0}
-                    pz := z <  31 ? bufferRead[x + 16][y + 16][z + 16 + 1] : {0, 0}
+                    nx := buffer[x + 16 - 1][y + 16][z + 16]
+                    px := buffer[x + 16 + 1][y + 16][z + 16]
+                    ny := buffer[x + 16][y + 16 - 1][z + 16]
+                    py := buffer[x + 16][y + 16 + 1][z + 16]
+                    nz := buffer[x + 16][y + 16][z + 16 - 1]
+                    pz := buffer[x + 16][y + 16][z + 16 + 1]
 
                     blockLight: u8 = 0;
                     if current.x <= 16 {
@@ -434,17 +404,17 @@ iluminate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
                         sunLight = max(sunLight, current.y)
                     }
 
-                    bufferWrite[x + 16][y + 16][z + 16] = {blockLight, sunLight}
+                    buffer[x + 16][y + 16][z + 16] = {blockLight, sunLight}
                 }
             }
-            // noWorkDoneCache[y + 16] = noWorkDone
+            noWorkDoneCache[y + 16] = noWorkDone
         }
     }
 
     for x in 0..<16 {
         for y in 0..<16 {
             for z in 0..<16 {
-                chunk.primer[x][y][z].light = bufferRead[x + 16][y + 16][z + 16]
+                chunk.primer[x][y][z].light = buffer[x + 16][y + 16][z + 16]
             }
         }
     }
@@ -536,6 +506,10 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
 
     for chunk in chunksToPopulate {
         sunlight(chunk)
+    }
+
+    for chunk in chunksToPopulate {
+        iluminate(chunk, tempMap)
     }
 
     // for chunk in chunksToPopulate {
