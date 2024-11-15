@@ -46,36 +46,40 @@ cameraMove :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 }
 
-meshes_chan: chan.Chan(mesh.ChunkData)
+ThreadWork :: struct {
+	chunkPosition: [3]i32,
+}
+
+threadWorkChan: chan.Chan(ThreadWork)
+meshesChan: chan.Chan(mesh.ChunkData)
 // allChunksCopy: map[[3]i32]^world.Chunk
 // dataChunksCopy: map[[3]i32]mesh.ChunkData
 
 function :: proc(^thread.Thread) {
-	skeewb.console_log(.INFO, "isso veio de um thread!")
-	chunks := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, &world.allChunks)
-	defer delete(chunks)
-	chunksData := worldRender.generateManyMeshes(chunks, &world.allChunks)
-	defer delete(chunksData)
-	for &chunkData in chunksData {
-		chan.send(meshes_chan, chunkData)
+	for !chan.is_closed(threadWorkChan) {
+		work, ok := chan.recv(threadWorkChan)
+		if !ok {
+			continue
+		}
+		
+		chunks := world.peak(work.chunkPosition.x, work.chunkPosition.y, work.chunkPosition.z, &world.allChunks)
+		defer delete(chunks)
+		chunksData := worldRender.generateManyMeshes(chunks, &world.allChunks)
+		defer delete(chunksData)
+
+		for &chunkData in chunksData {
+			chan.send(meshesChan, chunkData)
+		}
 	}
 }
 
 toReload := false
 
-reloadChunks :: proc(previous: ^thread.Thread) -> ^thread.Thread {
-	if previous != nil {
-		if thread.is_done(previous) {
-			thread.destroy(previous)
-			toReload = false
-		} else {
-			toReload = true
-			return previous
-		}
-	}
-	t := thread.create(function)
-	thread.start(t)
-	return t
+reloadChunks :: proc() {
+	toReload = false
+	chan.send(threadWorkChan, ThreadWork {
+		chunkPosition = playerCamera.chunk,
+	})
 }
 
 main :: proc() {
@@ -88,7 +92,8 @@ main :: proc() {
 
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
-	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
+	meshesChan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
+	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 1024 * 1024, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -172,8 +177,11 @@ main :: proc() {
 	
 	// 	skeewb.console_log(.INFO, "OpenGL: Enabled Debug Message Callback");
 	// }
+	
+	t := thread.create(function)
+	thread.start(t)
+	reloadChunks()
 
-	t := reloadChunks(nil)
 	loop: for {
 		tracy.FrameMark()
 		duration := time.tick_since(start_tick)
@@ -255,14 +263,14 @@ main :: proc() {
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						t = reloadChunks(t)
+						reloadChunks()
 					}
 				} else if event.button.button == 3 {
 					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						t = reloadChunks(t)
+						reloadChunks()
 					}
 				}
 			}
@@ -315,16 +323,16 @@ main :: proc() {
 			moved = true
 		}
 
-		if moved {t = reloadChunks(t)}
+		if moved {reloadChunks()}
 
-		if toReload {t = reloadChunks(t)}
+		if toReload {reloadChunks()}
 		
 		{
 			tmp := [dynamic]mesh.ChunkData{}
 			defer delete(tmp)
 			done := false
 			for {
-				chunk, ok := chan.try_recv(meshes_chan)
+				chunk, ok := chan.try_recv(meshesChan)
 				if !ok {
 					//if t != nil {thread.destroy(t)}
 					break
@@ -374,7 +382,9 @@ main :: proc() {
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 	}
 	
-	if t != nil {thread.destroy(t)}
+	chan.close(threadWorkChan)
+	chan.close(meshesChan)
+	thread.destroy(t)
 	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)

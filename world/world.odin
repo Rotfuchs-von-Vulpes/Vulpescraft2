@@ -13,7 +13,7 @@ iVec3 :: [3]i32
 vec3 :: [3]f32
 
 blockState :: struct {
-    id: u32,
+    id: u16,
     light: [2]u8,
 }
 Primer :: [16][16][16]blockState
@@ -189,7 +189,7 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tem
         c = side
     }
 
-    c.primer[x][y][z].id = id
+    c.primer[x][y][z].id = u16(id)
     c.primer[x][y][z].light = {0, 0}
 }
 
