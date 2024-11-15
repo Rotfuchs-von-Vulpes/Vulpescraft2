@@ -137,7 +137,7 @@ filterCubes :: proc(primers: ^Primers) -> [dynamic]Cube {
 
                 if id == 0 {continue}
 
-                if hasSideExposed(primers, pos) {append(&filtered, Cube{id, pos})}
+                if hasSideExposed(primers, pos) {append(&filtered, Cube{u32(id), pos})}
             }
         }
     }
