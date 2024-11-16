@@ -107,7 +107,7 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     chunk.level = 1
 }
 
-setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
+setBlock :: proc(x, y, z: i32, id: u16, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
     x := x; y := y; z := z; c := c
 
     for x >= 16 {
@@ -189,20 +189,22 @@ setBlock :: proc(x, y, z: i32, id: u32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tem
         c = side
     }
 
-    c.primer[x][y][z].id = u16(id)
+    c.primer[x][y][z].id = id
     c.primer[x][y][z].light = {0, 0}
 }
 
-placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
+placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk, rnd: f32) {
     setBlock(x, y, z, 2, c, chunks, tempMap)
 
-    for i := y + 1; i <= y + 5; i += 1 {
-        if i - y == 2 {
+    for i := y + 1; i <= y + 5; i += 1 { 
+        if i - y == 2 && rnd <= 2 {
             setBlock(x, i, z, 9, c, chunks, tempMap)
         } else {
             setBlock(x, i, z, 6, c, chunks, tempMap)
         }
     }
+
+    leaves: u16 = rnd <= 1 || rnd >= 3 ? 7 : 5
 
     for i: i32 = x - 2; i <= x + 2; i += 1 {
         for j: i32 = z - 2; j <= z + 2; j += 1 {
@@ -212,7 +214,7 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^m
 
                 if xx && zz || i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c, chunks, tempMap);
+                setBlock(i, k, j, leaves, c, chunks, tempMap);
             }
         }
     }
@@ -225,7 +227,7 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^m
 
                 if xx && zz || k == y + 5 && i == x && j == z {continue}
 
-                setBlock(i, k, j, 7, c, chunks, tempMap);
+                setBlock(i, k, j, leaves, c, chunks, tempMap);
             }
         }
     }
@@ -233,6 +235,7 @@ placeTree :: proc(x, y, z: i32, c: ^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^m
 
 populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
     for c in popChunks {
+        if c.level != 1 do continue
         x := c.pos.x
         y := c.pos.y
         z := c.pos.z
@@ -256,7 +259,7 @@ populate :: proc(popChunks: ^[dynamic]^Chunk, chunks: ^[dynamic]^Chunk, tempMap:
             }
         
             if toPlace {
-                placeTree(i32(x0), i32(y0), i32(z0), c, chunks, tempMap)
+                placeTree(i32(x0), i32(y0), i32(z0), c, chunks, tempMap, 4 * rand.float32(rnd))
             }
         }
 
@@ -286,9 +289,9 @@ getBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> blockState {
     return c.primer[x - chunkX * 16][y - chunkY * 16][z - chunkZ * 16]
 }
 
-chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> bool {
+chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> ^Chunk {
     if x < -16 || x >= 31 || y < -16 || y >= 31 || z < -16 || z >= 31 {
-        return false
+        return nil
     }
     
     chunkX := int(math.floor(f32(x) / 16));
@@ -296,14 +299,18 @@ chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> bool {
     chunkZ := int(math.floor(f32(z) / 16));
 
     if chunkX < -1 || chunkX > 1 || chunkY < -1 || chunkY > 1 || chunkZ < -1 || chunkZ > 1 {
-        return false
+        return nil
     }
 
-    return chunks[chunkX + 1][chunkY + 1][chunkZ + 1] != nil
+    return chunks[chunkX + 1][chunkY + 1][chunkZ + 1]
 }
 
-sunlight :: proc(chunk: ^Chunk) {
+sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
+    if chunk.level != 2 do return
     buffer: [16][16][16][2]u8
+    solidCache: [16][16][16]bool
+
+    topChunk := chunk.sides[.Up]
 
     for x in 0..<16 {
         for z in 0..<16 {
@@ -321,14 +328,67 @@ sunlight :: proc(chunk: ^Chunk) {
                 emissive: u8 = 0
                 if id == 9 {emissive = 15}
 
+                top := u8(15)
+                if y == 15 {
+                    if topChunk != nil {
+                        top = topChunk.primer[x][0][z].light.y
+                    }
+                } else {
+                    top = buffer[x][y + 1][z].y
+                }
+
                 if foundGround {
                     buffer[x][y][z] = {emissive, 0}
                 } else if transparent {
                     buffer[x][y][z].x = emissive
-                    buffer[x][y][z].y = y < 15 ? clamp(buffer[x][y + 1][z].y - 1, 0, 15) : 0
+                    buffer[x][y][z].y = clamp(top - 1, 0, 15)
                 } else {
                     buffer[x][y][z].x = emissive
-                    buffer[x][y][z].y = y < 15 ? clamp(buffer[x][y + 1][z].y, 0, 15) : 15
+                    buffer[x][y][z].y = top
+                }
+            }
+        }
+    }
+
+    for x in 0..<16 {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                block := chunk.primer[x][y][z]
+
+                solidCache[x][y][z] = block.id != 0 && block.id != 7 && block.id != 8
+            }
+        }
+    }
+
+    for i in 0..<16 {
+        for x := i32(0); x < 16; x += 1 {
+            for y := i32(0); y < 16; y += 1 {
+                for z := i32(0); z < 16; z += 1 {
+                    sunLight := buffer[x][y][z].y
+                    if sunLight < 15 {
+                        brighest := sunLight
+                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].y)
+                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].y)
+                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].y)
+                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].y)
+                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].y)
+                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].y)
+    
+                        buffer[x][y][z].y = brighest > 1 ? max(brighest - 1, sunLight) : sunLight
+                    }
+                    
+                    blockLight := buffer[x][y][z].x
+                    if blockLight < 15 {
+                        brighest := blockLight
+                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].x)
+                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].x)
+                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].x)
+                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].x)
+                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].x)
+                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].x)
+    
+                        buffer[x][y][z].x = brighest > 1 ? max(brighest - 1, blockLight) : blockLight
+                    }
                 }
             }
         }
@@ -341,92 +401,102 @@ sunlight :: proc(chunk: ^Chunk) {
             }
         }
     }
+
+    chunk.level = 3
 }
 
-iluminate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
-    chunkMatrix: [3][3][3]^Chunk
-    buffer: [16 * 3][16 * 3][16 * 3][2]u8
-    solidCache: [16 * 3][16 * 3][16 * 3]bool
+localIluminate :: proc(chunk: ^Chunk) {
+    buffer: [16][16][16][2]u8
+    solidCache: [16][16][16]bool
+    transparentCache: [16][16][16]bool
+}
 
-    for i: i32 = -1; i <= 1; i += 1 {
-        for j: i32 = -1; j <= 1; j += 1 {
-            for k: i32 = -1; k <= 1; k += 1 {
-                chunkMatrix[i + 1][j + 1][k + 1] = tempMap[iVec3{chunk.pos.x + i, chunk.pos.y + j, chunk.pos.z + k}]
-            }
-        }
-    }
+/*
+iluminate :: proc(chunk: ^Chunk) {
+    // chunkMatrix: [3][3][3]^Chunk
+    buffer: [16][16][16][2]u8
+    solidCache: [16][16][16]bool
 
-    for x in -16..<32 {
-        for z in -16..<32 {
-            for y := 31; y >= -16; y -= 1 {
-                block := getBlock(x, y, z, chunkMatrix)
+    // for i: i32 = -1; i <= 1; i += 1 {
+    //     for j: i32 = -1; j <= 1; j += 1 {
+    //         for k: i32 = -1; k <= 1; k += 1 {
+    //             chunkMatrix[i + 1][j + 1][k + 1] = tempMap[iVec3{chunk.pos.x + i, chunk.pos.y + j, chunk.pos.z + k}]
+    //         }
+    //     }
+    // }
+
+    for x in 0..<16 {
+        for z in 0..<16 {
+            for y in 0..<16 {
+                block := chunk.primer[x][y][z]
                 id := block.id
 
-                solidCache[x + 16][y + 16][z + 16] = id != 0
+                solidCache[x][y][z] = id != 0
 
-                buffer[x + 16][y + 16][z + 16] = block.light
+                buffer[x][y][z] = block.light
             }
         }
     }
 
-    noWorkDoneCache := [3 * 16]bool{} 
     for i in 0..<16 {
-        for y in -15..<31 {
-            if noWorkDoneCache[y + 16] {continue}
+        for y in 0..<16 {
             noWorkDone := true
-            for x in -15..<31 {
-                for z in -15..<31 {
-                    current := buffer[x + 16][y + 16][z + 16]
+            for x in 0..<16 {
+                for z in 0..<16 {
+                    current := buffer[x][y][z]
 
-                    if current.x >= 15 && current.y >= 15 {continue}
+                    if current.x >= 15 && current.y >= 15 do continue
 
-                    if solidCache[x + 16][y + 16][z + 16] {continue}
+                    if solidCache[x][y][z] do continue
 
                     noWorkDone = false
 
-                    nx := buffer[x + 16 - 1][y + 16][z + 16]
-                    px := buffer[x + 16 + 1][y + 16][z + 16]
-                    ny := buffer[x + 16][y + 16 - 1][z + 16]
-                    py := buffer[x + 16][y + 16 + 1][z + 16]
-                    nz := buffer[x + 16][y + 16][z + 16 - 1]
-                    pz := buffer[x + 16][y + 16][z + 16 + 1]
+                    nx := x ==  0 ? [2]u8{0, 0} : buffer[x - 1][y][z]
+                    px := x == 15 ? [2]u8{0, 0} : buffer[x + 1][y][z]
+                    ny := y ==  0 ? [2]u8{0, 0} : buffer[x][y - 1][z]
+                    py := y == 15 ? [2]u8{0, 0} : buffer[x][y + 1][z]
+                    nz := z ==  0 ? [2]u8{0, 0} : buffer[x][y][z - 1]
+                    pz := z == 15 ? [2]u8{0, 0} : buffer[x][y][z + 1]
 
                     blockLight: u8 = 0;
-                    if current.x <= 16 {
+                    if current.x < 15 {
                         blockLight = max(max(max(nx.x, px.x), max(ny.x, py.x)), max(nz.x, pz.x))
-                        if blockLight > 0 {blockLight -= 1}
+                        blockLight -= u8(blockLight > 0)
                         blockLight = max(blockLight, current.x)
+                    } else {
+                        blockLight = 15
                     }
                     sunLight: u8 = 0;
-                    if current.y < 16 {
+                    if current.y < 15 {
                         sunLight = max(max(max(nx.y, px.y), max(ny.y, py.y)), max(nz.y, pz.y))
-                        if sunLight > 0 {sunLight -= 1}
+                        sunLight -= u8(sunLight > 0)
                         sunLight = max(sunLight, current.y)
+                    } else {
+                        sunLight = 15
                     }
 
-                    buffer[x + 16][y + 16][z + 16] = {blockLight, sunLight}
+                    buffer[x][y][z] = {blockLight, sunLight}
                 }
             }
-            noWorkDoneCache[y + 16] = noWorkDone
+            if noWorkDone do break
         }
     }
 
     for x in 0..<16 {
         for y in 0..<16 {
             for z in 0..<16 {
-                chunk.primer[x][y][z].light = buffer[x + 16][y + 16][z + 16]
+                chunk.primer[x][y][z].light = buffer[x][y][z]
             }
         }
     }
 
-    chunk.level = 3
-}
+    chunk.level = 4
+}*/
 
 eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
     pos := iVec3{x, y, z}
-    chunk, inserted, _ := util.map_force_get(tempMap, pos)
-    if inserted {
-        // skeewb.console_log(.INFO, "%d", chunk^.primer[0][0][0].id)
+    chunk, empty, _ := util.map_force_get(tempMap, pos)
+    if empty {
         chunk^ = new(Chunk)
         getNewChunk(chunk^, x, y, z)
         setBlocksChunk(chunk^, terrain.getHeightMap(x, z))
@@ -464,6 +534,7 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     history := make(map[iVec3]bool)
     defer delete(history)
     history[worms[0]] = true
+    tops := make(map[iVec2]iVec3)
 
     for i := 0; i < len(worms); i += 1 {
         worm := worms[i]
@@ -498,22 +569,38 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     populate(&chunksToPopulate, &chunksToSide, tempMap)
 
     for chunk in chunksToSide {
+        pos := chunk.pos
+        top, empty, _ := util.map_force_get(&tops, iVec2{pos.x, pos.z})
+        if empty {
+            top^ = pos
+        } else if top.y < pos.y {
+            top.y = pos.y
+        }
+
         dist := chunk.pos - iVec3{x, y, z}
         if abs(dist.x) < VIEW_DISTANCE && abs(dist.y) < VIEW_DISTANCE && abs(dist.z) < VIEW_DISTANCE {
             append(&chunksToView, chunk)
         }
     }
 
-    for chunk in chunksToPopulate {
-        sunlight(chunk)
-    }
-
-    for chunk in chunksToPopulate {
-        iluminate(chunk, tempMap)
+    for _, top in tops {
+        init := i32(0)
+        previous: ^Chunk
+        for {
+            chunk := tempMap[top - {0, init, 0}]
+            if chunk == nil do break
+            if previous != nil {
+                chunk.sides[.Up] = previous
+                previous.sides[.Bottom] = chunk
+            }
+            init += 1
+            sunlight(chunk, tempMap)
+            previous = chunk
+        }
     }
 
     // for chunk in chunksToPopulate {
-    //     iluminate(chunk, tempMap)
+    //     iluminate(chunk)
     // }
 
     return chunksToView
@@ -521,9 +608,9 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
 
 getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
-        i32(math.floor(f32(pos.x) / 16)),
-        i32(math.floor(f32(pos.y) / 16)),
-        i32(math.floor(f32(pos.z) / 16))
+        (pos.x + 16) / 16 - 1,
+        (pos.y + 16) / 16 - 1,
+        (pos.z + 16) / 16 - 1
     }
 
     chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
