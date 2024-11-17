@@ -305,8 +305,7 @@ chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> ^Chunk {
     return chunks[chunkX + 1][chunkY + 1][chunkZ + 1]
 }
 
-sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
-    if chunk.level != 2 do return
+sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u8, [16][16][16]bool) {
     buffer: [16][16][16][2]u8
     solidCache: [16][16][16]bool
 
@@ -318,15 +317,19 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
             for y := 15; y >= 0; y -= 1 {
                 block := chunk.primer[x][y][z]
                 id := block.id
-                transparent := id == 7 || id == 8
+                transparent := id == 7 || id == 8 || id == 9
                 solid := id != 0 && !transparent
+                
+                solidCache[x][y][z] = solid
 
                 if solid {
                     foundGround = true
                 }
 
                 emissive: u8 = 0
-                if id == 9 {emissive = 15}
+                if id == 9 {
+                    emissive = 15
+                }
 
                 top := u8(15)
                 if y == 15 {
@@ -350,20 +353,13 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
         }
     }
 
-    for x in 0..<16 {
-        for y in 0..<16 {
-            for z in 0..<16 {
-                block := chunk.primer[x][y][z]
-
-                solidCache[x][y][z] = block.id != 0 && block.id != 7 && block.id != 8
-            }
-        }
-    }
-
     for i in 0..<16 {
         for x := i32(0); x < 16; x += 1 {
             for y := i32(0); y < 16; y += 1 {
                 for z := i32(0); z < 16; z += 1 {
+                    if buffer[x][y][z].x >= 15 && buffer[x][y][z].x >= 15 do continue
+                    if solidCache[x][y][z] do continue
+
                     sunLight := buffer[x][y][z].y
                     if sunLight < 15 {
                         brighest := sunLight
@@ -403,82 +399,122 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     }
 
     chunk.level = 3
+
+    return buffer, solidCache
 }
 
-localIluminate :: proc(chunk: ^Chunk) {
-    buffer: [16][16][16][2]u8
-    solidCache: [16][16][16]bool
-    transparentCache: [16][16][16]bool
-}
+iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) {
+    buffer := buffer
+    
+    mxx := chunk.sides[.West]
+    pxx := chunk.sides[.East]
+    xmx := chunk.sides[.Bottom]
+    xpx := chunk.sides[.Up]
+    xxm := chunk.sides[.South]
+    xxp := chunk.sides[.North]
+    
+    mxxWall: [16][16][2]u8
+    pxxWall: [16][16][2]u8
+    xmxWall: [16][16][2]u8
+    xpxWall: [16][16][2]u8
+    xxmWall: [16][16][2]u8
+    xxpWall: [16][16][2]u8
 
-/*
-iluminate :: proc(chunk: ^Chunk) {
-    // chunkMatrix: [3][3][3]^Chunk
-    buffer: [16][16][16][2]u8
-    solidCache: [16][16][16]bool
-
-    // for i: i32 = -1; i <= 1; i += 1 {
-    //     for j: i32 = -1; j <= 1; j += 1 {
-    //         for k: i32 = -1; k <= 1; k += 1 {
-    //             chunkMatrix[i + 1][j + 1][k + 1] = tempMap[iVec3{chunk.pos.x + i, chunk.pos.y + j, chunk.pos.z + k}]
-    //         }
-    //     }
-    // }
-
-    for x in 0..<16 {
-        for z in 0..<16 {
+    if mxx != nil {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                mxxWall[y][z] = mxx.primer[15][y][z].light
+            }
+        }
+    }
+    if pxx != nil {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                pxxWall[y][z] = pxx.primer[0][y][z].light
+            }
+        }
+    }
+    if xmx != nil {
+        for x in 0..<16 {
+            for z in 0..<16 {
+                xmxWall[x][z] = xmx.primer[x][15][z].light
+            }
+        }
+    }
+    if xpx != nil {
+        for x in 0..<16 {
+            for z in 0..<16 {
+                xpxWall[x][z] = xpx.primer[x][0][z].light
+            }
+        }
+    }
+    if xxm != nil {
+        for x in 0..<16 {
             for y in 0..<16 {
-                block := chunk.primer[x][y][z]
-                id := block.id
-
-                solidCache[x][y][z] = id != 0
-
-                buffer[x][y][z] = block.light
+                xxmWall[x][y] = xxm.primer[x][y][15].light
+            }
+        }
+    }
+    if xxp != nil {
+        for x in 0..<16 {
+            for y in 0..<16 {
+                xxpWall[x][y] = xxp.primer[x][y][0].light
             }
         }
     }
 
     for i in 0..<16 {
-        for y in 0..<16 {
-            noWorkDone := true
-            for x in 0..<16 {
+        for x in 0..<16 {
+            //noWorkDone := true
+            for y in 0..<16 {
                 for z in 0..<16 {
-                    current := buffer[x][y][z]
-
-                    if current.x >= 15 && current.y >= 15 do continue
-
+                    if buffer[x][y][z].x >= 15 && buffer[x][y][z].y >= 15 do continue
                     if solidCache[x][y][z] do continue
 
-                    noWorkDone = false
+                    //noWorkDone = false
 
-                    nx := x ==  0 ? [2]u8{0, 0} : buffer[x - 1][y][z]
-                    px := x == 15 ? [2]u8{0, 0} : buffer[x + 1][y][z]
-                    ny := y ==  0 ? [2]u8{0, 0} : buffer[x][y - 1][z]
-                    py := y == 15 ? [2]u8{0, 0} : buffer[x][y + 1][z]
-                    nz := z ==  0 ? [2]u8{0, 0} : buffer[x][y][z - 1]
-                    pz := z == 15 ? [2]u8{0, 0} : buffer[x][y][z + 1]
+                    sunLight := buffer[x][y][z].y
+                    if sunLight < 15 {
+                        brighest := sunLight
+                        if x ==  0 && mxx != nil do brighest = max(brighest, mxxWall[y][z].y)
+                        if x == 15 && pxx != nil do brighest = max(brighest, pxxWall[y][z].y)
+                        if y ==  0 && xmx != nil do brighest = max(brighest, xmxWall[x][z].y)
+                        if y == 15 && xpx != nil do brighest = max(brighest, xpxWall[x][z].y)
+                        if z ==  0 && xxm != nil do brighest = max(brighest, xxmWall[x][y].y)
+                        if z == 15 && xxp != nil do brighest = max(brighest, xxpWall[x][y].y)
 
-                    blockLight: u8 = 0;
-                    if current.x < 15 {
-                        blockLight = max(max(max(nx.x, px.x), max(ny.x, py.x)), max(nz.x, pz.x))
-                        blockLight -= u8(blockLight > 0)
-                        blockLight = max(blockLight, current.x)
-                    } else {
-                        blockLight = 15
+                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].y)
+                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].y)
+                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].y)
+                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].y)
+                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].y)
+                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].y)
+    
+                        buffer[x][y][z].y = brighest > 1 ? max(brighest - 1, sunLight) : sunLight
                     }
-                    sunLight: u8 = 0;
-                    if current.y < 15 {
-                        sunLight = max(max(max(nx.y, px.y), max(ny.y, py.y)), max(nz.y, pz.y))
-                        sunLight -= u8(sunLight > 0)
-                        sunLight = max(sunLight, current.y)
-                    } else {
-                        sunLight = 15
-                    }
+                    
+                    blockLight := buffer[x][y][z].x
+                    if blockLight < 15 {
+                        brighest := blockLight
+                        if x ==  0 && mxx != nil do brighest = max(brighest, mxxWall[y][z].x)
+                        if x == 15 && pxx != nil do brighest = max(brighest, pxxWall[y][z].x)
+                        if y ==  0 && xmx != nil do brighest = max(brighest, xmxWall[x][z].x)
+                        if y == 15 && xpx != nil do brighest = max(brighest, xpxWall[x][z].x)
+                        if z ==  0 && xxm != nil do brighest = max(brighest, xxmWall[x][y].x)
+                        if z == 15 && xxp != nil do brighest = max(brighest, xxpWall[x][y].x)
 
-                    buffer[x][y][z] = {blockLight, sunLight}
+                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].x)
+                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].x)
+                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].x)
+                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].x)
+                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].x)
+                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].x)
+    
+                        buffer[x][y][z].x = brighest > 1 ? max(brighest - 1, blockLight) : blockLight
+                    }
                 }
             }
-            if noWorkDone do break
+            //if noWorkDone do break
         }
     }
 
@@ -491,7 +527,7 @@ iluminate :: proc(chunk: ^Chunk) {
     }
 
     chunk.level = 4
-}*/
+}
 
 eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
     pos := iVec3{x, y, z}
@@ -570,12 +606,21 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
 
     for chunk in chunksToSide {
         pos := chunk.pos
-        top, empty, _ := util.map_force_get(&tops, iVec2{pos.x, pos.z})
-        if empty {
-            top^ = pos
-        } else if top.y < pos.y {
-            top.y = pos.y
+        if chunk.level == 2 {
+            top, empty, _ := util.map_force_get(&tops, iVec2{pos.x, pos.z})
+            if empty {
+                top^ = pos
+            } else if top.y < pos.y {
+                top.y = pos.y
+            }
         }
+
+        chunk.sides[.West]   = tempMap[chunk.pos + {-1, 0, 0}]
+        chunk.sides[.East]   = tempMap[chunk.pos + {1, 0, 0}]
+        chunk.sides[.Bottom] = tempMap[chunk.pos + {0, -1, 0}]
+        chunk.sides[.Up]     = tempMap[chunk.pos + {0, 1, 0}]
+        chunk.sides[.South]  = tempMap[chunk.pos + {0, 0, -1}]
+        chunk.sides[.North]  = tempMap[chunk.pos + {0, 0, 1}]
 
         dist := chunk.pos - iVec3{x, y, z}
         if abs(dist.x) < VIEW_DISTANCE && abs(dist.y) < VIEW_DISTANCE && abs(dist.z) < VIEW_DISTANCE {
@@ -583,25 +628,29 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
         }
     }
 
+    Cache :: struct{
+        chunk: ^Chunk,
+        buffer: [16][16][16][2]u8,
+        solid: [16][16][16]bool,
+    }
+
+    toIluminate := [dynamic]Cache{}
+    defer delete(toIluminate)
+
     for _, top in tops {
         init := i32(0)
-        previous: ^Chunk
         for {
             chunk := tempMap[top - {0, init, 0}]
             if chunk == nil do break
-            if previous != nil {
-                chunk.sides[.Up] = previous
-                previous.sides[.Bottom] = chunk
-            }
             init += 1
-            sunlight(chunk, tempMap)
-            previous = chunk
+            buffer, solidCache := sunlight(chunk, tempMap)
+            append(&toIluminate, Cache{chunk, buffer, solidCache})
         }
     }
 
-    // for chunk in chunksToPopulate {
-    //     iluminate(chunk)
-    // }
+    for cache in toIluminate {
+        iluminate(cache.chunk, cache.buffer, cache.solid)
+    }
 
     return chunksToView
 }
