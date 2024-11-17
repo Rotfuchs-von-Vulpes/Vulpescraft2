@@ -403,7 +403,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
     return buffer, solidCache
 }
 
-iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) {
+iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) -> [16][16][16][2]u8 {
     buffer := buffer
     
     mxx := chunk.sides[.West]
@@ -527,6 +527,8 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     }
 
     chunk.level = 4
+
+    return buffer
 }
 
 eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
@@ -648,7 +650,11 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
         }
     }
 
-    for cache in toIluminate {
+    for &cache in toIluminate {
+        cache.buffer = iluminate(cache.chunk, cache.buffer, cache.solid)
+    }
+
+    for &cache in toIluminate {
         iluminate(cache.chunk, cache.buffer, cache.solid)
     }
 
