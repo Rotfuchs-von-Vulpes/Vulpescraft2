@@ -19,6 +19,7 @@ import mesh "worldRender/meshGenerator"
 import "frameBuffer"
 import "util"
 import "sky"
+import "worldRender/debug"
 
 import "tracy"
 
@@ -138,7 +139,9 @@ main :: proc() {
 	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
+	debugRender := debug.Render{{}, 0}
 
+	debug.setup(&debugRender)
 	worldRender.setupBlockDrawing(&blockRender)
 	worldRender.setupWaterDrawing(&waterRender)
 
@@ -169,6 +172,7 @@ main :: proc() {
 	toBehind := false
 	toRight := false
 	toLeft := false
+	toDebug := false
 
 	// if (gl.DebugMessageCallback != nil) {
 	// 	gl.Enable(gl.DEBUG_OUTPUT);
@@ -203,6 +207,8 @@ main :: proc() {
 						toLeft = false
 					case .D:
 						toRight = false
+					case .F1:
+						toDebug = !toDebug
 				}
 			} else if event.type == .KEYDOWN {
 				#partial switch (event.key.keysym.sym) {
@@ -363,6 +369,11 @@ main :: proc() {
 		gl.UseProgram(sunRender.program)
 		sky.drawSun(&playerCamera, sunRender, deltaTime)
 		gl.Enable(gl.DEPTH_TEST)
+		if toDebug {
+			gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+			debug.draw(&playerCamera, debugRender)
+			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+		}
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
 		worldRender.drawWater(chunks, &playerCamera, waterRender)
 		
@@ -410,16 +421,21 @@ main :: proc() {
 	for key, value in sunRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in debugRender.uniforms {
+		delete(value.name)
+	}
 	delete(blockRender.uniforms)
 	delete(waterRender.uniforms)
 	delete(fboRender.uniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
+	delete(debugRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(waterRender.program)
 	gl.DeleteProgram(fboRender.program)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
+	gl.DeleteProgram(debugRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
 	// delete(allChunksCopy)
 	// delete(dataChunksCopy)
