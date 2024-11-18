@@ -239,21 +239,65 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Prime
 
     posV := iVec3{pos.x, pos.y, pos.z}
 
-    chunk, normalPos, ok := getBlockPos(primers, posV + normal)
+    signX: i32 = 1
+    signY: i32 = 1
+    signZ: i32 = 1
+    if offset.x == 0 {signX = -1}
+    if offset.y == 0 {signY = -1}
+    if offset.z == 0 {signZ = -1}
+
+    side1Pos, side2Pos: iVec3
+
+    if normal.x != 0 {
+        side1Pos = posV + {signX, signY, 0}
+        side2Pos = posV + {signX, 0, signZ}
+    } else if normal.y != 0 {
+        side1Pos = posV + {signX, signY, 0}
+        side2Pos = posV + {0, signY, signZ}
+    } else if normal.z != 0 {
+        side1Pos = posV + {signX, 0, signZ}
+        side2Pos = posV + {0, signY, signZ}
+    }
+
+    cornerPrimer, cornerPos, _ := getBlockPos(primers, posV + {signX, signY, signZ})
+    side1Primer, side1Pos2, _ := getBlockPos(primers, side1Pos)
+    side2Primer, side2Pos2, _ := getBlockPos(primers, side2Pos)
+    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z]
+    side1 := side1Primer.primer[side1Pos2.x][side1Pos2.y][side1Pos2.z]
+    side2 := side2Primer.primer[side2Pos2.x][side2Pos2.y][side2Pos2.z]
+
+    chunk, normalPos, _ := getBlockPos(primers, posV + normal)
     light := chunk.primer[normalPos.x][normalPos.y][normalPos.z].light
-    return {f32(light.x), f32(light.y)}
+    blockLight := f32(light.x)
+    sunLight := f32(light.y)
+    side1light := side1.light
+    side2light := side2.light
+    count := f32(0)
+    if side1.id == 0 {
+        blockLight = max(blockLight, f32(side1.light.x))
+        sunLight = max(sunLight, f32(side1.light.y))
+    }
+    if side2.id == 0 {
+        blockLight = max(blockLight, f32(side2.light.x))
+        sunLight = max(sunLight, f32(side2.light.y))
+    }
+    if corner.id == 0 {
+        blockLight = max(blockLight, f32(corner.light.x))
+        sunLight = max(sunLight, f32(corner.light.y))
+    }
+    return {f32(blockLight), f32(sunLight)}
 }
 
 getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, primers: Primers) -> f32 {
-    up: iVec3
+    normal: iVec3
 
     switch direction {
-        case .Up:     up = { 0, 1, 0}
-        case .Bottom: up = { 0,-1, 0}
-        case .North:  up = { 0, 0, 1}
-        case .South:  up = { 0, 0,-1}
-        case .East:   up = { 1, 0, 0}
-        case .West:   up = {-1, 0, 0}
+        case .Up:     normal = { 0, 1, 0}
+        case .Bottom: normal = { 0,-1, 0}
+        case .North:  normal = { 0, 0, 1}
+        case .South:  normal = { 0, 0,-1}
+        case .East:   normal = { 1, 0, 0}
+        case .West:   normal = {-1, 0, 0}
     }
 
     posV: iVec3 = {pos.x, pos.y, pos.z}
@@ -265,23 +309,23 @@ getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, primers: Primers) 
     if offset.y == 0 {signY = -1}
     if offset.z == 0 {signZ = -1}
 
-    cornerPrimer, cornerPos, ok := getBlockPos(primers, posV + {signX, signY, signZ})
-    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z].id
     side1Pos, side2Pos: iVec3
 
-    if up.x != 0 {
+    if normal.x != 0 {
         side1Pos = posV + {signX, signY, 0}
         side2Pos = posV + {signX, 0, signZ}
-    } else if up.y != 0 {
+    } else if normal.y != 0 {
         side1Pos = posV + {signX, signY, 0}
         side2Pos = posV + {0, signY, signZ}
-    } else if up.z != 0 {
+    } else if normal.z != 0 {
         side1Pos = posV + {signX, 0, signZ}
         side2Pos = posV + {0, signY, signZ}
     }
 
-    side1Primer, side1Pos2, ok1 := getBlockPos(primers, side1Pos)
-    side2Primer, side2Pos2, ok2 := getBlockPos(primers, side2Pos)
+    cornerPrimer, cornerPos, _ := getBlockPos(primers, posV + {signX, signY, signZ})
+    side1Primer, side1Pos2, _ := getBlockPos(primers, side1Pos)
+    side2Primer, side2Pos2, _ := getBlockPos(primers, side2Pos)
+    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z].id
     side1 := side1Primer.primer[side1Pos2.x][side1Pos2.y][side1Pos2.z].id
     side2 := side2Primer.primer[side2Pos2.x][side2Pos2.y][side2Pos2.z].id
 

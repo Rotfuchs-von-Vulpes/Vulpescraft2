@@ -322,7 +322,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                 
                 solidCache[x][y][z] = solid
 
-                if solid {
+                if id != 0 {
                     foundGround = true
                 }
 
@@ -342,9 +342,6 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
 
                 if foundGround {
                     buffer[x][y][z] = {emissive, 0}
-                } else if transparent {
-                    buffer[x][y][z].x = emissive
-                    buffer[x][y][z].y = clamp(top - 1, 0, 15)
                 } else {
                     buffer[x][y][z].x = emissive
                     buffer[x][y][z].y = top
@@ -577,10 +574,6 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     for i := 0; i < len(worms); i += 1 {
         worm := worms[i]
         c := eval(worm.x, worm.y, worm.z, tempMap)
-        if c == nil {
-            skeewb.console_log(.INFO, "bruh")
-            continue
-        }
         append(&chunksToSide, c)
         if c.level == 1 && abs(worm.x - x) < VIEW_DISTANCE + 1 && abs(worm.y - y) < VIEW_DISTANCE + 1 && abs(worm.z - z) < VIEW_DISTANCE + 1 {append(&chunksToPopulate, c)}
 
@@ -606,17 +599,17 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
 
     populate(&chunksToPopulate, &chunksToSide, tempMap)
 
-    for chunk in chunksToSide {
+    for chunk in chunksToPopulate {
         pos := chunk.pos
-        if chunk.level == 2 {
-            top, empty, _ := util.map_force_get(&tops, iVec2{pos.x, pos.z})
-            if empty {
-                top^ = pos
-            } else if top.y < pos.y {
-                top.y = pos.y
-            }
+        top, empty, _ := util.map_force_get(&tops, iVec2{pos.x, pos.z})
+        if empty {
+            top^ = pos
+        } else if top.y < pos.y {
+            top.y = pos.y
         }
+    }
 
+    for chunk in chunksToSide {
         chunk.sides[.West]   = tempMap[chunk.pos + {-1, 0, 0}]
         chunk.sides[.East]   = tempMap[chunk.pos + {1, 0, 0}]
         chunk.sides[.Bottom] = tempMap[chunk.pos + {0, -1, 0}]
