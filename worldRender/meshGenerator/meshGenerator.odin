@@ -270,8 +270,6 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Prime
     light := chunk.primer[normalPos.x][normalPos.y][normalPos.z].light
     blockLight := f32(light.x)
     sunLight := f32(light.y)
-    side1light := side1.light
-    side2light := side2.light
     count := f32(0)
     if side1.id == 0 {
         blockLight = max(blockLight, f32(side1.light.x))
