@@ -271,15 +271,15 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Prime
     blockLight := f32(light.x)
     sunLight := f32(light.y)
     count := f32(0)
-    if side1.id == 0 {
+    if side1.id == 0 || side1.id == 9 {
         blockLight = max(blockLight, f32(side1.light.x))
         sunLight = max(sunLight, f32(side1.light.y))
     }
-    if side2.id == 0 {
+    if side2.id == 0 || side2.id == 9 {
         blockLight = max(blockLight, f32(side2.light.x))
         sunLight = max(sunLight, f32(side2.light.y))
     }
-    if corner.id == 0 {
+    if corner.id == 0 || corner.id == 9 {
         blockLight = max(blockLight, f32(corner.light.x))
         sunLight = max(sunLight, f32(corner.light.y))
     }
