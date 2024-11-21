@@ -2,6 +2,7 @@ package world
 
 import "../skeewb"
 import "core:math"
+import "core:time"
 import "core:math/rand"
 import "core:fmt"
 import "core:mem/virtual"
@@ -257,9 +258,18 @@ chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> ^Chunk {
     return chunks[chunkX + 1][chunkY + 1][chunkZ + 1]
 }
 
+Light :: struct{
+    pos: iVec3,
+    value: u8,
+}
+
 sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u8, [16][16][16]bool) {
     buffer: [16][16][16][2]u8
     solidCache: [16][16][16]bool
+    sunlightCache := [dynamic]Light{}
+    defer delete(sunlightCache)
+    emissiveCache := [dynamic]Light{}
+    defer delete(emissiveCache)
 
     topChunk := chunk.sides[.Up]
 
@@ -278,9 +288,8 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                     foundGround = true
                 }
 
-                emissive: u8 = 0
                 if id == 9 {
-                    emissive = 15
+                    append(&emissiveCache, Light{iVec3{i32(x), i32(y), i32(z)}, 15})
                 }
 
                 top := u8(15)
@@ -292,51 +301,50 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                     top = buffer[x][y + 1][z].y
                 }
 
-                if foundGround {
-                    buffer[x][y][z] = {emissive, 0}
-                } else {
-                    buffer[x][y][z].x = emissive
+                if !foundGround {
                     buffer[x][y][z].y = top
+                    append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, top})
                 }
             }
         }
     }
-
-    for i in 0..<16 {
-        for x := i32(0); x < 16; x += 1 {
-            for y := i32(0); y < 16; y += 1 {
-                for z := i32(0); z < 16; z += 1 {
-                    if buffer[x][y][z].x >= 15 && buffer[x][y][z].x >= 15 do continue
-                    if solidCache[x][y][z] do continue
-
-                    sunLight := buffer[x][y][z].y
-                    if sunLight < 15 {
-                        brighest := sunLight
-                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].y)
-                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].y)
-                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].y)
-                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].y)
-                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].y)
-                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].y)
     
-                        buffer[x][y][z].y = brighest > 1 ? max(brighest - 1, sunLight) : sunLight
-                    }
-                    
-                    blockLight := buffer[x][y][z].x
-                    if blockLight < 15 {
-                        brighest := blockLight
-                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].x)
-                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].x)
-                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].x)
-                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].x)
-                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].x)
-                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].x)
+    for &light in sunlightCache {
+        pos := light.pos
+        if light.value <= 1 do continue
+        if solidCache[pos.x][pos.y][pos.z] do continue
+        if buffer[pos.x][pos.y][pos.z].y >= light.value do continue
     
-                        buffer[x][y][z].x = brighest > 1 ? max(brighest - 1, blockLight) : blockLight
-                    }
-                }
-            }
-        }
+        x := pos.x
+        y := pos.y
+        z := pos.z
+    
+        buffer[x][y][z].y = light.value
+        if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
+        if x != 15 do append(&sunlightCache, Light{iVec3{x + 1, y, z}, light.value - 1})
+        if y !=  0 do append(&sunlightCache, Light{iVec3{x, y - 1, z}, light.value - 1})
+        if y != 15 do append(&sunlightCache, Light{iVec3{x, y + 1, z}, light.value - 1})
+        if z !=  0 do append(&sunlightCache, Light{iVec3{x, y, z - 1}, light.value - 1})
+        if z != 15 do append(&sunlightCache, Light{iVec3{x, y, z + 1}, light.value - 1})
+    }
+    
+    for &light in emissiveCache {
+        pos := light.pos
+        if light.value <= 1 do continue
+        if solidCache[pos.x][pos.y][pos.z] do continue
+        if buffer[pos.x][pos.y][pos.z].x >= light.value do continue
+    
+        x := pos.x
+        y := pos.y
+        z := pos.z
+    
+        buffer[x][y][z].x = light.value
+        if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
+        if x != 15 do append(&emissiveCache, Light{iVec3{x + 1, y, z}, light.value - 1})
+        if y !=  0 do append(&emissiveCache, Light{iVec3{x, y - 1, z}, light.value - 1})
+        if y != 15 do append(&emissiveCache, Light{iVec3{x, y + 1, z}, light.value - 1})
+        if z !=  0 do append(&emissiveCache, Light{iVec3{x, y, z - 1}, light.value - 1})
+        if z != 15 do append(&emissiveCache, Light{iVec3{x, y, z + 1}, light.value - 1})
     }
 
     for x in 0..<16 {
@@ -361,98 +369,91 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     xpx := chunk.sides[.Up]
     xxm := chunk.sides[.South]
     xxp := chunk.sides[.North]
-    
-    mxxWall: [16][16][2]u8
-    pxxWall: [16][16][2]u8
-    xmxWall: [16][16][2]u8
-    xpxWall: [16][16][2]u8
-    xxmWall: [16][16][2]u8
-    xxpWall: [16][16][2]u8
 
+    emissiveCache := [dynamic]Light{}
+    defer delete(emissiveCache)
+    sunlightCache := [dynamic]Light{}
+    defer delete(sunlightCache)
+
+    for y in 0..<16 {
+        for z in 0..<16 {
+            light := mxx.primer[15][y][z].light
+            if light.y > 1 do append(&sunlightCache, Light{{0, i32(y), i32(z)}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{0, i32(y), i32(z)}, light.x - 1})
+        }
+    }
+    for y in 0..<16 {
+        for z in 0..<16 {
+            light := pxx.primer[0][y][z].light
+            if light.y > 1 do append(&sunlightCache, Light{{15, i32(y), i32(z)}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{15, i32(y), i32(z)}, light.x - 1})
+        }
+    }
+    for x in 0..<16 {
+        for z in 0..<16 {
+            light := xmx.primer[x][15][z].light
+            if light.y > 1 do append(&sunlightCache, Light{{i32(x), 0, i32(z)}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{i32(x), 0, i32(z)}, light.x - 1})
+        }
+    }
+    for x in 0..<16 {
+        for z in 0..<16 {
+            light := xpx.primer[x][0][z].light
+            if light.y > 1 do append(&sunlightCache, Light{{i32(x), 15, i32(z)}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{i32(x), 15, i32(z)}, light.x - 1})
+        }
+    }
+    for x in 0..<16 {
         for y in 0..<16 {
-            for z in 0..<16 {
-                mxxWall[y][z] = mxx.primer[15][y][z].light
-            }
+            light := xxm.primer[x][y][15].light
+            if light.y > 1 do append(&sunlightCache, Light{{i32(x), i32(y), 0}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{i32(x), i32(y), 0}, light.x - 1})
         }
+    }
+    for x in 0..<16 {
         for y in 0..<16 {
-            for z in 0..<16 {
-                pxxWall[y][z] = pxx.primer[0][y][z].light
-            }
+            light := xxp.primer[x][y][0].light
+            if light.y > 1 do append(&sunlightCache, Light{{i32(x), i32(y), 15}, light.y - 1})
+            if light.x > 1 do append(&emissiveCache, Light{{i32(x), i32(y), 15}, light.x - 1})
         }
-        for x in 0..<16 {
-            for z in 0..<16 {
-                xmxWall[x][z] = xmx.primer[x][15][z].light
-            }
-        }
-        for x in 0..<16 {
-            for z in 0..<16 {
-                xpxWall[x][z] = xpx.primer[x][0][z].light
-            }
-        }
-        for x in 0..<16 {
-            for y in 0..<16 {
-                xxmWall[x][y] = xxm.primer[x][y][15].light
-            }
-        }
-        for x in 0..<16 {
-            for y in 0..<16 {
-                xxpWall[x][y] = xxp.primer[x][y][0].light
-            }
-        }
-
-    for i in 0..<16 {
-        for x in 0..<16 {
-            //noWorkDone := true
-            for y in 0..<16 {
-                for z in 0..<16 {
-                    if solidCache[x][y][z] do continue
-
-                    //noWorkDone = false
-
-                    light := buffer[x][y][z]
-                    sunLight := light.y
-                    if sunLight < 15 {
-                        brighest := sunLight
-                        if x ==  0 do brighest = max(brighest, mxxWall[y][z].y)
-                        if x == 15 do brighest = max(brighest, pxxWall[y][z].y)
-                        if y ==  0 do brighest = max(brighest, xmxWall[x][z].y)
-                        if y == 15 do brighest = max(brighest, xpxWall[x][z].y)
-                        if z ==  0 do brighest = max(brighest, xxmWall[x][y].y)
-                        if z == 15 do brighest = max(brighest, xxpWall[x][y].y)
-
-                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].y)
-                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].y)
-                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].y)
-                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].y)
-                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].y)
-                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].y)
+    }
     
-                        buffer[x][y][z].y = brighest > 1 ? brighest - 1 : 0
-                    }
-                    
-                    blockLight := light.x
-                    if blockLight < 15 {
-                        brighest := blockLight
-                        if x ==  0 do brighest = max(brighest, mxxWall[y][z].x)
-                        if x == 15 do brighest = max(brighest, pxxWall[y][z].x)
-                        if y ==  0 do brighest = max(brighest, xmxWall[x][z].x)
-                        if y == 15 do brighest = max(brighest, xpxWall[x][z].x)
-                        if z ==  0 do brighest = max(brighest, xxmWall[x][y].x)
-                        if z == 15 do brighest = max(brighest, xxpWall[x][y].x)
-
-                        if x !=  0 do brighest = max(brighest, buffer[x - 1][y][z].x)
-                        if x != 15 do brighest = max(brighest, buffer[x + 1][y][z].x)
-                        if y !=  0 do brighest = max(brighest, buffer[x][y - 1][z].x)
-                        if y != 15 do brighest = max(brighest, buffer[x][y + 1][z].x)
-                        if z !=  0 do brighest = max(brighest, buffer[x][y][z - 1].x)
-                        if z != 15 do brighest = max(brighest, buffer[x][y][z + 1].x)
+    for &light in sunlightCache {
+        pos := light.pos
+        if light.value <= 1 do continue
+        if solidCache[pos.x][pos.y][pos.z] do continue
+        if buffer[pos.x][pos.y][pos.z].y >= light.value do continue
     
-                        buffer[x][y][z].x = brighest > 1 ? brighest - 1 : 0
-                    }
-                }
-            }
-            //if noWorkDone do break
-        }
+        x := pos.x
+        y := pos.y
+        z := pos.z
+    
+        buffer[x][y][z].y = light.value
+        if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
+        if x != 15 do append(&sunlightCache, Light{iVec3{x + 1, y, z}, light.value - 1})
+        if y !=  0 do append(&sunlightCache, Light{iVec3{x, y - 1, z}, light.value - 1})
+        if y != 15 do append(&sunlightCache, Light{iVec3{x, y + 1, z}, light.value - 1})
+        if z !=  0 do append(&sunlightCache, Light{iVec3{x, y, z - 1}, light.value - 1})
+        if z != 15 do append(&sunlightCache, Light{iVec3{x, y, z + 1}, light.value - 1})
+    }
+    
+    for &light in emissiveCache {
+        pos := light.pos
+        if light.value <= 1 do continue
+        if solidCache[pos.x][pos.y][pos.z] do continue
+        if buffer[pos.x][pos.y][pos.z].x >= light.value do continue
+    
+        x := pos.x
+        y := pos.y
+        z := pos.z
+    
+        buffer[x][y][z].x = light.value
+        if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
+        if x != 15 do append(&emissiveCache, Light{iVec3{x + 1, y, z}, light.value - 1})
+        if y !=  0 do append(&emissiveCache, Light{iVec3{x, y - 1, z}, light.value - 1})
+        if y != 15 do append(&emissiveCache, Light{iVec3{x, y + 1, z}, light.value - 1})
+        if z !=  0 do append(&emissiveCache, Light{iVec3{x, y, z - 1}, light.value - 1})
+        if z != 15 do append(&emissiveCache, Light{iVec3{x, y, z + 1}, light.value - 1})
     }
 
     chunk.level = 4
@@ -579,6 +580,7 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     sunLighetHistory := make(map[iVec2]bool)
     defer delete(sunLighetHistory)
 
+    t := time.tick_now()
     for &chunk in chunksToSide {
         if sunLighetHistory[{chunk.pos.x, chunk.pos.z}] do continue
         init := i32(0)
@@ -600,6 +602,14 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
 
     for &cache in toIluminate {
         cache.buffer = iluminate(cache.chunk, cache.buffer, cache.solid)
+
+        for x in 0..<16 {
+            for y in 0..<16 {
+                for z in 0..<16 {
+                    cache.chunk.primer[x][y][z].light = cache.buffer[x][y][z]
+                }
+            }
+        }
     }
 
     for &cache in toIluminate {
@@ -613,6 +623,7 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
             }
         }
     }
+    skeewb.console_log(.INFO, "%d", i32(time.duration_milliseconds(time.tick_since(t))))
 
     return chunksToView
 }
