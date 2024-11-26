@@ -220,44 +220,6 @@ populate :: proc(chunks: ^[dynamic]^Chunk, tempMap: ^map[iVec3]^Chunk) {
     }
 }
 
-getBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> blockState {
-    if x < -16 || x >= 31 || y < -16 || y >= 31 || z < -16 || z >= 31 {
-        return blockState{0, {0, 0}}
-    }
-    
-    chunkX := int(math.floor(f32(x) / 16));
-    chunkY := int(math.floor(f32(y) / 16));
-    chunkZ := int(math.floor(f32(z) / 16));
-
-    if chunkX < -1 || chunkX > 1 || chunkY < -1 || chunkY > 1 || chunkZ < -1 || chunkZ > 1 {
-        return blockState{0, {0, 0}}
-    }
-
-    c := chunks[chunkX + 1][chunkY + 1][chunkZ + 1]
-
-    if c == nil {
-        return blockState{0, {0, 0}}
-    }
-
-    return c.primer[x - chunkX * 16][y - chunkY * 16][z - chunkZ * 16]
-}
-
-chunkFromBlock :: proc(x, y, z: int, chunks: [3][3][3]^Chunk) -> ^Chunk {
-    if x < -16 || x >= 31 || y < -16 || y >= 31 || z < -16 || z >= 31 {
-        return nil
-    }
-    
-    chunkX := int(math.floor(f32(x) / 16));
-    chunkY := int(math.floor(f32(y) / 16));
-    chunkZ := int(math.floor(f32(z) / 16));
-
-    if chunkX < -1 || chunkX > 1 || chunkY < -1 || chunkY > 1 || chunkZ < -1 || chunkZ > 1 {
-        return nil
-    }
-
-    return chunks[chunkX + 1][chunkY + 1][chunkZ + 1]
-}
-
 Light :: struct{
     pos: iVec3,
     value: u8,
