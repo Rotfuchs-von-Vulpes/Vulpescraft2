@@ -108,20 +108,38 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
         offsetZ -= 1
     }
 
-    for i in 0..=1 {
-        for j in 0..=1 {
-            for k in 0..=1 {
-                chunkPos: iVec3 = {
-                    chunk.pos.x + i32(i) * offsetX,
-                    chunk.pos.y + i32(j) * offsetY,
-                    chunk.pos.z + i32(k) * offsetZ
-                }
-                chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
+    chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z, &allChunks)
+    chunk.level = 2
+    append(&chunks, chunk)
 
-                append(&chunks, chunk)
-            }
-        }
+    if pos.x == 0 {
+        chunk := eval(chunk.pos.x - 1, chunk.pos.y, chunk.pos.z, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
+    } else if pos.x == 15 {
+        chunk := eval(chunk.pos.x + 1, chunk.pos.y, chunk.pos.z, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
     }
+    if pos.y == 0 {
+        chunk := eval(chunk.pos.x, chunk.pos.y - 1, chunk.pos.z, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
+    } else if pos.y == 15 {
+        chunk := eval(chunk.pos.x, chunk.pos.y + 1, chunk.pos.z, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
+    }
+    if pos.z == 0 {
+        chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z - 1, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
+    } else if pos.z == 15 {
+        chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z + 1, &allChunks)
+        chunk.level = 2
+        append(&chunks, chunk)
+    }
+
 
     return chunks
 }

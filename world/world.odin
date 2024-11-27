@@ -242,6 +242,7 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
             chunk2 := tempMap[chunk.pos + {0, init, 0}]
             if chunk2 == nil do break
             init -= 1
+            if chunk2.level > 2 do continue 
             buffer, solidCache := sunlight(chunk2, tempMap)
             if hasAllSides(chunk2) do append(&toIluminate, Cache{chunk2, buffer, solidCache})
         }
