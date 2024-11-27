@@ -259,23 +259,6 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     return chunksToView
 }
 
-getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
-    chunkPos := iVec3{
-        (pos.x + 16) / 16 - 1,
-        (pos.y + 16) / 16 - 1,
-        (pos.z + 16) / 16 - 1
-    }
-
-    chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
-
-    iPos: iVec3
-    iPos.x = pos.x %% 16
-    iPos.y = pos.y %% 16
-    iPos.z = pos.z %% 16
-
-    return chunk, iPos
-}
-
 nuke :: proc() {
     delete(chunkMap)
     delete(allChunks)
