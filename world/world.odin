@@ -227,6 +227,7 @@ Light :: struct{
 
 sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u8, [16][16][16]bool) {
     buffer: [16][16][16][2]u8
+    cache: [16][16][16]u8
     solidCache: [16][16][16]bool
     sunlightCache := [dynamic]Light{}
     defer delete(sunlightCache)
@@ -260,11 +261,11 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                         top = topChunk.primer[x][0][z].light.y
                     }
                 } else {
-                    top = buffer[x][y + 1][z].y
+                    top = cache[x][y + 1][z]
                 }
 
                 if !foundGround {
-                    buffer[x][y][z].y = top
+                    cache[x][y][z] = top
                     append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, top})
                 }
             }
@@ -274,7 +275,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
     for &light in sunlightCache {
         pos := light.pos
         if solidCache[pos.x][pos.y][pos.z] do continue
-        if buffer[pos.x][pos.y][pos.z].y > light.value do continue
+        if buffer[pos.x][pos.y][pos.z].y >= light.value do continue
     
         x := pos.x
         y := pos.y
@@ -293,7 +294,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
     for &light in emissiveCache {
         pos := light.pos
         if solidCache[pos.x][pos.y][pos.z] do continue
-        if buffer[pos.x][pos.y][pos.z].x > light.value do continue
+        if buffer[pos.x][pos.y][pos.z].x >= light.value do continue
     
         x := pos.x
         y := pos.y
@@ -383,7 +384,7 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     for &light in sunlightCache {
         pos := light.pos
         if solidCache[pos.x][pos.y][pos.z] do continue
-        if buffer[pos.x][pos.y][pos.z].y > light.value do continue
+        if buffer[pos.x][pos.y][pos.z].y >= light.value do continue
     
         x := pos.x
         y := pos.y
@@ -402,7 +403,7 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     for &light in emissiveCache {
         pos := light.pos
         if solidCache[pos.x][pos.y][pos.z] do continue
-        if buffer[pos.x][pos.y][pos.z].x > light.value do continue
+        if buffer[pos.x][pos.y][pos.z].x >= light.value do continue
     
         x := pos.x
         y := pos.y
@@ -416,6 +417,14 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
         if y != 15 do append(&emissiveCache, Light{iVec3{x, y + 1, z}, light.value - 1})
         if z !=  0 do append(&emissiveCache, Light{iVec3{x, y, z - 1}, light.value - 1})
         if z != 15 do append(&emissiveCache, Light{iVec3{x, y, z + 1}, light.value - 1})
+    }
+
+    for x in 0..<16 {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                chunk.primer[x][y][z].light = buffer[x][y][z]
+            }
+        }
     }
 
     chunk.level = 4
@@ -563,27 +572,11 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
     }
 
     for &cache in toIluminate {
-        //cache.buffer = iluminate(cache.chunk, cache.buffer, cache.solid)
-
-        for x in 0..<16 {
-            for y in 0..<16 {
-                for z in 0..<16 {
-                    cache.chunk.primer[x][y][z].light = cache.buffer[x][y][z]
-                }
-            }
-        }
+        cache.buffer = iluminate(cache.chunk, cache.buffer, cache.solid)
     }
 
     for &cache in toIluminate {
-        buffer := iluminate(cache.chunk, cache.buffer, cache.solid)
-
-        for x in 0..<16 {
-            for y in 0..<16 {
-                for z in 0..<16 {
-                    cache.chunk.primer[x][y][z].light = buffer[x][y][z]
-                }
-            }
-        }
+        iluminate(cache.chunk, cache.buffer, cache.solid)
     }
     skeewb.console_log(.INFO, "%d", i32(time.duration_milliseconds(time.tick_since(t))))
 
