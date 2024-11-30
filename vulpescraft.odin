@@ -52,11 +52,10 @@ ThreadWork :: struct {
 }
 
 threadWorkChan: chan.Chan(ThreadWork)
-meshesChan: chan.Chan(mesh.ChunkData)
-// allChunksCopy: map[[3]i32]^world.Chunk
-// dataChunksCopy: map[[3]i32]mesh.ChunkData
+chunks_chan: chan.Chan(^world.Chunk)
+meshes_chan: chan.Chan(mesh.ChunkData)
 
-function :: proc(^thread.Thread) {
+generateChunkBlocks :: proc(^thread.Thread) {
 	for !chan.is_closed(threadWorkChan) {
 		work, ok := chan.recv(threadWorkChan)
 		if !ok {
@@ -65,11 +64,26 @@ function :: proc(^thread.Thread) {
 		
 		chunks := world.peak(work.chunkPosition.x, work.chunkPosition.y, work.chunkPosition.z, &world.allChunks)
 		defer delete(chunks)
-		chunksData := worldRender.generateManyMeshes(chunks, &world.allChunks)
-		defer delete(chunksData)
 
-		for &chunkData in chunksData {
-			chan.send(meshesChan, chunkData)
+		for &chunk in chunks {
+			chan.send(chunks_chan, chunk)
+		}
+	}
+}
+
+generateChunkMesh :: proc(^thread.Thread) {
+	for !chan.is_closed(chunks_chan) {
+		tmp := [dynamic]^world.Chunk{}
+		for {
+			chunk, ok := chan.try_recv(chunks_chan)
+			if !ok {
+				break
+			}
+			append(&tmp, chunk)
+		}
+		chunksData := worldRender.generateManyMeshes(tmp, &world.allChunks)
+		for &chunk in chunksData {
+			chan.send(meshes_chan, chunk)
 		}
 	}
 }
@@ -93,7 +107,8 @@ main :: proc() {
 
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
-	meshesChan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
+	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
+	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 1024 * 1024, chunksAllocator)
 	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 1024 * 1024, chunksAllocator)
 	
 	start_tick := time.tick_now()
@@ -182,8 +197,10 @@ main :: proc() {
 	// 	skeewb.console_log(.INFO, "OpenGL: Enabled Debug Message Callback");
 	// }
 	
-	t := thread.create(function)
-	thread.start(t)
+	chunkGenereatorThread := thread.create(generateChunkBlocks)
+	thread.start(chunkGenereatorThread)
+	meshGenereatorThread := thread.create(generateChunkMesh)
+	thread.start(meshGenereatorThread)
 	reloadChunks()
 
 	loop: for {
@@ -338,9 +355,8 @@ main :: proc() {
 			defer delete(tmp)
 			done := false
 			for {
-				chunk, ok := chan.try_recv(meshesChan)
+				chunk, ok := chan.try_recv(meshes_chan)
 				if !ok {
-					//if t != nil {thread.destroy(t)}
 					break
 				}
 				done = true
@@ -351,7 +367,6 @@ main :: proc() {
 				if allChunks != nil {
 					delete(allChunks)
 				}
-				//if t != nil {thread.destroy(t)}
 				if chunks != nil {delete(chunks)}
 				allChunks = worldRender.setupManyChunks(&tmp)
 				worldRender.frustumMove(&allChunks, &playerCamera)
@@ -394,8 +409,10 @@ main :: proc() {
 	}
 	
 	chan.close(threadWorkChan)
-	chan.close(meshesChan)
-	thread.destroy(t)
+	chan.close(chunks_chan)
+	chan.close(meshes_chan)
+	thread.destroy(chunkGenereatorThread)
+	thread.destroy(meshGenereatorThread)
 	
 	prev_allocator := context.allocator
 	context.allocator = mem.tracking_allocator(tracking_allocator)
