@@ -109,34 +109,34 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
     }
 
     chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z, &allChunks)
-    chunk.level = 2
+    chunk.level = .Trees
     append(&chunks, chunk)
 
     if pos.x == 0 {
         chunk := eval(chunk.pos.x - 1, chunk.pos.y, chunk.pos.z, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     } else if pos.x == 15 {
         chunk := eval(chunk.pos.x + 1, chunk.pos.y, chunk.pos.z, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     }
     if pos.y == 0 {
         chunk := eval(chunk.pos.x, chunk.pos.y - 1, chunk.pos.z, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     } else if pos.y == 15 {
         chunk := eval(chunk.pos.x, chunk.pos.y + 1, chunk.pos.z, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     }
     if pos.z == 0 {
         chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z - 1, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     } else if pos.z == 15 {
         chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z + 1, &allChunks)
-        chunk.level = 2
+        chunk.level = .Trees
         append(&chunks, chunk)
     }
 

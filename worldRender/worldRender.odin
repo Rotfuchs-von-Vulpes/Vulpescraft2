@@ -62,11 +62,11 @@ eval :: proc(data: mesh.ChunkData) -> ChunkBuffer {
     return chunkBuffer^
 }
 
-generateManyMeshes :: proc(chunks: [dynamic]^world.Chunk, tempMap: ^map[iVec3]^world.Chunk) -> [dynamic]mesh.ChunkData {
+generateManyMeshes :: proc(chunks: [dynamic]^world.Chunk) -> [dynamic]mesh.ChunkData {
     chunksData: [dynamic]mesh.ChunkData
 
     for &chunk in chunks {
-        append(&chunksData, mesh.generateMesh(chunk, tempMap))
+        append(&chunksData, mesh.generateMesh(chunk))
     }
 
     return chunksData

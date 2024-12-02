@@ -508,23 +508,36 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> (Mesh, Mesh) {
     return {blockVertices, blockIndices, i32(len(blockIndices))}, {waterVertices, waterIndices, i32(len(waterIndices))}
 }
 
-generateMesh :: proc(chunk: ^world.Chunk, tempMap: ^map[iVec3]^world.Chunk) -> ChunkData {
+generateMesh :: proc(chunk: ^world.Chunk) -> ChunkData {
     x := chunk.pos.x
     y := chunk.pos.y
     z := chunk.pos.z
     
     primers: Primers
 
-    for i: i32 = 0; i < 3; i += 1 {
-        for j: i32 = 0; j < 3; j += 1 {
-            for k: i32 = 0; k < 3; k += 1 {
-                pos := iVec3{x + i - 1, y + j - 1, z + k - 1}
-                primers[i][j][k] = tempMap[pos]
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := chunk
+                if i < 0 {
+                    c = c.sides[.West]
+                } else if i > 0 {
+                    c = c.sides[.East]
+                }
+                if j < 0 {
+                    c = c.sides[.Bottom]
+                } else if j > 0 {
+                    c = c.sides[.Up]
+                }
+                if k < 0 {
+                    c = c.sides[.South]
+                } else if k > 0 {
+                    c = c.sides[.North]
+                }
+                primers[i + 1][j + 1][k + 1] = c
             }
         }
     }
-
-    //primers[1][1][1] = chunk
 
     cubes := filterCubes(&primers)
     cubesFaces := makeCubes(&primers, cubes)

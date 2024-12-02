@@ -1,5 +1,7 @@
 package world
 
+import "../skeewb"
+
 Light :: struct{
     pos: iVec3,
     value: u8,
@@ -9,6 +11,23 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
     buffer: [16][16][16][2]u8
     cache: [16][16][16]u8
     solidCache: [16][16][16]bool
+    if chunk.level != .Trees {
+        for x in 0..<16 {
+            for y in 0..<16 {
+                for z in 0..<16 {
+                    block := chunk.primer[x][y][z]
+                    id := block.id
+                    transparent := id == 7 || id == 8 || id == 9
+                    solid := id != 0 && !transparent
+                    
+                    solidCache[x][y][z] = solid
+                    buffer[x][y][z] = chunk.primer[x][y][z].light
+                }
+            }
+        }
+
+        return buffer, solidCache
+    }
     sunlightCache := [dynamic]Light{}
     defer delete(sunlightCache)
     emissiveCache := [dynamic]Light{}
@@ -98,66 +117,78 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
         }
     }
 
-    chunk.level = 3
+    chunk.level = .InternalLight
 
     return buffer, solidCache
 }
 
-iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) -> [16][16][16][2]u8 {
+iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) {
     buffer := buffer
-    
-    mxx := chunk.sides[.West]
-    pxx := chunk.sides[.East]
-    xmx := chunk.sides[.Bottom]
-    xpx := chunk.sides[.Up]
-    xxm := chunk.sides[.South]
-    xxp := chunk.sides[.North]
+
+    if chunk.level != .InternalLight do return
+
+    chunks: [3][3][3]^Chunk
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := chunk
+                if i < 0 {
+                    c = c.sides[.West]
+                } else if i > 0 {
+                    c = c.sides[.East]
+                }
+                if j < 0 {
+                    c = c.sides[.Bottom]
+                } else if j > 0 {
+                    c = c.sides[.Up]
+                }
+                if k < 0 {
+                    c = c.sides[.South]
+                } else if k > 0 {
+                    c = c.sides[.North]
+                }
+                chunks[i + 1][j + 1][k + 1] = c
+            }
+        }
+    }
 
     emissiveCache := [dynamic]Light{}
     defer delete(emissiveCache)
     sunlightCache := [dynamic]Light{}
     defer delete(sunlightCache)
+    
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := chunks[i + 1][j + 1][k + 1]
 
-    for y in 0..<16 {
-        for z in 0..<16 {
-            light := mxx.primer[15][y][z].light
-            if light.y > 1 do append(&sunlightCache, Light{{0, i32(y), i32(z)}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{0, i32(y), i32(z)}, light.x - 1})
-        }
-    }
-    for y in 0..<16 {
-        for z in 0..<16 {
-            light := pxx.primer[0][y][z].light
-            if light.y > 1 do append(&sunlightCache, Light{{15, i32(y), i32(z)}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{15, i32(y), i32(z)}, light.x - 1})
-        }
-    }
-    for x in 0..<16 {
-        for z in 0..<16 {
-            light := xmx.primer[x][15][z].light
-            if light.y > 1 do append(&sunlightCache, Light{{i32(x), 0, i32(z)}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{i32(x), 0, i32(z)}, light.x - 1})
-        }
-    }
-    for x in 0..<16 {
-        for z in 0..<16 {
-            light := xpx.primer[x][0][z].light
-            if light.y > 1 do append(&sunlightCache, Light{{i32(x), 15, i32(z)}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{i32(x), 15, i32(z)}, light.x - 1})
-        }
-    }
-    for x in 0..<16 {
-        for y in 0..<16 {
-            light := xxm.primer[x][y][15].light
-            if light.y > 1 do append(&sunlightCache, Light{{i32(x), i32(y), 0}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{i32(x), i32(y), 0}, light.x - 1})
-        }
-    }
-    for x in 0..<16 {
-        for y in 0..<16 {
-            light := xxp.primer[x][y][0].light
-            if light.y > 1 do append(&sunlightCache, Light{{i32(x), i32(y), 15}, light.y - 1})
-            if light.x > 1 do append(&emissiveCache, Light{{i32(x), i32(y), 15}, light.x - 1})
+                count: u8 = 0
+
+                if i != 0 do count += 1
+                if j != 0 do count += 1
+                if k != 0 do count += 1
+
+                if count == 0 do continue
+                for x in 0..<16 {
+                    if i == 1 && x != 0 do continue
+                    if i == -1 && x != 15 do continue
+                    for y in 0..<16 {
+                        if j == 1 && y != 0 do continue
+                        if j == -1 && y != 15 do continue
+                        for z in 0..<16 {
+                            if k == 1 && z != 0 do continue
+                            if k == -1 && z != 15 do continue
+                            light := c.primer[x][y][z].light
+                            xx, yy, zz: i32
+                            xx = i != 0 ? 15 - i32(x) : i32(x)
+                            yy = j != 0 ? 15 - i32(y) : i32(y)
+                            zz = k != 0 ? 15 - i32(z) : i32(z)
+                            if light.y > count do append(&sunlightCache, Light{{xx, yy, zz}, light.y - count})
+                            if light.x > count do append(&emissiveCache, Light{{xx, yy, zz}, light.x - count})
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -207,7 +238,5 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
         }
     }
 
-    chunk.level = 4
-
-    return buffer
+    chunk.level = .ExternalLight
 }

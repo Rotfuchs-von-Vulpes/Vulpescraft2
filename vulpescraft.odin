@@ -61,29 +61,34 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		if !ok {
 			continue
 		}
-		
-		chunks := world.peak(work.chunkPosition.x, work.chunkPosition.y, work.chunkPosition.z, &world.allChunks)
-		defer delete(chunks)
 
-		for &chunk in chunks {
-			chan.send(chunks_chan, chunk)
+		//skeewb.console_log(.DEBUG, "a")
+
+		append(&world.genStack, work.chunkPosition)
+		for {
+			chunk, ok := world.genPoll(work.chunkPosition, &world.allChunks)
+			if !ok do break
+			if chunk != nil do chan.send(chunks_chan, chunk)
 		}
+		
+		// chunks := world.peak(work.chunkPosition.x, work.chunkPosition.y, work.chunkPosition.z, &world.allChunks)
+		// defer delete(chunks)
+
+		// for &chunk in chunks {
+		// 	chan.send(chunks_chan, chunk)
+		// }
 	}
 }
 
 generateChunkMesh :: proc(^thread.Thread) {
 	for !chan.is_closed(chunks_chan) {
-		tmp := [dynamic]^world.Chunk{}
+		chunks := [dynamic]^world.Chunk{}
 		for {
 			chunk, ok := chan.try_recv(chunks_chan)
 			if !ok {
 				break
 			}
-			append(&tmp, chunk)
-		}
-		chunksData := worldRender.generateManyMeshes(tmp, &world.allChunks)
-		for &chunk in chunksData {
-			chan.send(meshes_chan, chunk)
+			chan.send(meshes_chan, mesh.generateMesh(chunk))
 		}
 	}
 }
@@ -92,6 +97,17 @@ toReload := false
 
 reloadChunks :: proc() {
 	toReload = false
+
+	clear_map(&world.history)
+	buffer := [dynamic]worldRender.ChunkBuffer{}
+	for chunk, idx in allChunks {
+		if world.sqDist(chunk.pos, playerCamera.chunk, world.VIEW_DISTANCE) {
+			append(&buffer, chunk)
+		}
+	}
+	delete(allChunks)
+	allChunks = buffer
+
 	chan.send(threadWorkChan, ThreadWork {
 		chunkPosition = playerCamera.chunk,
 	})
@@ -351,8 +367,8 @@ main :: proc() {
 		if toReload {reloadChunks()}
 		
 		{
-			tmp := [dynamic]mesh.ChunkData{}
-			defer delete(tmp)
+			//tmp := [dynamic]mesh.ChunkData{}
+			//defer delete(tmp)
 			done := false
 			for {
 				chunk, ok := chan.try_recv(meshes_chan)
@@ -360,16 +376,17 @@ main :: proc() {
 					break
 				}
 				done = true
-				append(&tmp, chunk)
+				append(&allChunks, worldRender.eval(chunk))
 			}
 
 			if done {
-				if allChunks != nil {
-					delete(allChunks)
-				}
-				if chunks != nil {delete(chunks)}
-				allChunks = worldRender.setupManyChunks(&tmp)
+				// if allChunks != nil {
+				// 	delete(allChunks)
+				// }
+				// if chunks != nil {delete(chunks)}
+				// allChunks = worldRender.setupManyChunks(&tmp)
 				worldRender.frustumMove(&allChunks, &playerCamera)
+				delete(chunks)
 				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
 			}
 		}

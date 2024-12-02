@@ -22,12 +22,15 @@ Primer :: [16][16][16]blockState
 Direction :: enum {Up, Bottom, North, South, East, West}
 FaceSet :: bit_set[Direction]
 
+
+GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, ExternalLight}
 Chunk :: struct {
     pos: iVec3,
     sides: [Direction]^Chunk,
     primer: Primer,
     opened: FaceSet,
-    level: int
+    level: GeneratePhase,
+    isEmpty: bool,
 }
 
 allChunks := make(map[iVec3]^Chunk)
@@ -42,7 +45,7 @@ getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
         light = {0, 0},
     }
 
-    chunk.level = 0
+    chunk.level = .Empty
     chunk.opened = {}
     chunk.pos = {x, y, z}
     chunk.sides = {
@@ -53,9 +56,11 @@ getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
         .East = nil,
         .West = nil
     }
+    chunk.isEmpty = true
 }
 
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
+    empty := true
     for i in 0..<16 {
         for j in 0..<16 {
             height := int(heightMap[i][j])
@@ -74,13 +79,14 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
                     } else if i == 15 {
                         chunk.opened += {.East}
                     }
-                     if j == 0 {
+                    if j == 0 {
                         chunk.opened += {.South}
                     } else if j == 15 {
                         chunk.opened += {.North}
                     }
                 }
                 if localHeight - k > 0 {
+                    empty = false
                     if height > 15 {
                         if localHeight - k > 4 {
                             chunk.primer[i][k][j].id = 1
@@ -96,7 +102,8 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
                             chunk.primer[i][k][j].id = 4
                         }
                     }
-                } else if chunk.pos.y == 0 && k < 15 {
+                } else if chunk.pos.y <= 0 && k < 15 {
+                    empty = false
                     chunk.primer[i][k][j].id = 8
                 } else {
                     break
@@ -105,7 +112,8 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
         }
     }
 
-    chunk.level = 1
+    chunk.isEmpty = empty
+    chunk.level = .Blocks
 }
 
 eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
@@ -141,6 +149,135 @@ hasAllSides :: proc(chunk: ^Chunk) -> bool {
     }
 
     return true
+}
+
+sqDist :: proc(pos1, pos2: iVec3, dist: int) -> bool {
+    diff := pos1 - pos2
+    return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z < i32(dist * dist)
+}
+
+prevCenter: iVec3
+history := make(map[iVec3]bool)
+genStack := [dynamic]iVec3{}
+
+posOffsets: [Direction]iVec3 = {
+    .West   = {-1, 0, 0},
+    .East   = {1, 0, 0},
+    .Bottom = {0, -1, 0},
+    .Up     = {0, 1, 0},
+    .South  = {0, 0, -1},
+    .North  = {0, 0, 1},
+}
+opposite: [Direction]Direction = {
+    .West   = .East,
+    .East   = .West,
+    .Bottom = .Up,
+    .Up     = .Bottom,
+    .South  = .North,
+    .North  = .South,
+}
+
+genPoll :: proc(center: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool) {
+    if len(genStack) == 0 do return nil, false
+    pos := genStack[0]
+    history[pos] = true
+    prevCenter = center
+    unordered_remove(&genStack, 0)
+    chunk := eval(pos.x, pos.y, pos.z, tempMap)
+    if chunk.isEmpty do return nil, true
+    
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                for &cSide, dir in c.sides {
+                    offset := posOffsets[dir]
+                    if offset.y == 1 && j == 1 do continue
+                    if offset.y == -1 && j == -1 do continue
+                    // if offset.x == i32(i) && offset.y == i32(j) && offset.z == i32(k) do continue
+                    cSide = eval(c.pos.x + offset.x, c.pos.y + offset.y, c.pos.z + offset.z, tempMap)
+                }
+                populate(c, tempMap)
+                c.isEmpty = false
+            }
+        }
+    }
+
+    populate(chunk, tempMap)
+    // skeewb.console_log(.DEBUG, "%d, %d, %d", pos.x, pos.y, pos.z)
+    
+    Cache :: struct{
+        chunk: ^Chunk,
+        buffer: [16][16][16][2]u8,
+        solid: [16][16][16]bool,
+    }
+    toIluminate := [dynamic]Cache{}
+    defer delete(toIluminate)
+
+
+    for i in -1..=1 {
+        for j in -1..=1 {
+            c := chunk
+            if i < 0 {
+                c = c.sides[.West]
+            } else if i > 0 {
+                c = c.sides[.East]
+            }
+            if j < 0 {
+                c = c.sides[.South]
+            } else if j > 0 {
+                c = c.sides[.North]
+            }
+
+            if c == nil do continue
+
+            top := c
+            prev := c
+            for {
+                top = top.sides[.Up]
+                if top == nil do break
+                prev = top
+            }
+            top = prev
+            for {
+                chunk2 := top
+                if chunk2 == nil do break
+                top = top.sides[.Bottom]
+                if chunk2.level > .Trees do continue 
+                buffer, solidCache := sunlight(chunk2, tempMap)
+            }
+        }
+    }
+
+    // iluminate(chunk)
+
+    buffer, solidCache := sunlight(chunk, tempMap)
+    iluminate(chunk, buffer, solidCache)
+
+    // for &cache in toIluminate {
+    //     iluminate(cache.chunk, cache.buffer, cache.solid)
+    // }
+
+    if .West in chunk.opened && sqDist(pos + {-1, 0, 0}, center, VIEW_DISTANCE) && pos + {-1, 0, 0} not_in history {
+        append(&genStack, iVec3{pos.x - 1, pos.y, pos.z})
+    }
+    if .East in chunk.opened && sqDist(pos + {1, 0, 0}, center, VIEW_DISTANCE) && pos + {1, 0, 0} not_in history {
+        append(&genStack, iVec3{pos.x + 1, pos.y, pos.z})
+    }
+    if .Bottom in chunk.opened && sqDist(pos + {0,-1, 0}, center, VIEW_DISTANCE) && pos + {0,-1, 0} not_in history {
+        append(&genStack, iVec3{pos.x, pos.y - 1, pos.z})
+    }
+    if .Up in chunk.opened && sqDist(pos + {0, 1, 0}, center, VIEW_DISTANCE) && pos + {0, 1, 0} not_in history {
+        append(&genStack, iVec3{pos.x, pos.y + 1, pos.z})
+    }
+    if .South in chunk.opened && sqDist(pos + {0, 0,-1}, center, VIEW_DISTANCE) && pos + {0, 0,-1} not_in history {
+        append(&genStack, iVec3{pos.x, pos.y, pos.z - 1})
+    }
+    if .North in chunk.opened && sqDist(pos + {0, 0, 1}, center, VIEW_DISTANCE) && pos + {0, 0, 1} not_in history {
+        append(&genStack, iVec3{pos.x, pos.y, pos.z + 1})
+    }
+
+    return chunk, true
 }
 
 peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
@@ -180,15 +317,6 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
         }
     }
 
-    posOffsets: [Direction]iVec3 = {
-        .West   = {-1, 0, 0},
-        .East   = {1, 0, 0},
-        .Bottom = {0, -1, 0},
-        .Up     = {0, 1, 0},
-        .South  = {0, 0, -1},
-        .North  = {0, 0, 1},
-    }
-
     for &chunk in chunksToSide {
         dist := chunk.pos - iVec3{x, y, z}
         if dist.x * dist.x + dist.y * dist.y + dist.z * dist.z <= VIEW_DISTANCE * VIEW_DISTANCE {
@@ -214,7 +342,7 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
         }
     }
 
-    populate(&chunksToSide, tempMap)
+    //populate(&chunksToSide, tempMap)
 
     Cache :: struct{
         chunk: ^Chunk,
@@ -242,14 +370,14 @@ peak :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> [dynamic]^Chunk {
             chunk2 := tempMap[chunk.pos + {0, init, 0}]
             if chunk2 == nil do break
             init -= 1
-            if chunk2.level > 2 do continue 
+            if chunk2.level > .Trees do continue 
             buffer, solidCache := sunlight(chunk2, tempMap)
             if hasAllSides(chunk2) do append(&toIluminate, Cache{chunk2, buffer, solidCache})
         }
     }
 
     for &cache in toIluminate {
-        cache.buffer = iluminate(cache.chunk, cache.buffer, cache.solid)
+        iluminate(cache.chunk, cache.buffer, cache.solid)
     }
 
     for &cache in toIluminate {
