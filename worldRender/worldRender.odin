@@ -62,6 +62,10 @@ eval :: proc(data: mesh.ChunkData) -> ChunkBuffer {
     return chunkBuffer^
 }
 
+testMesh :: proc(pos: iVec3) -> bool {
+	return pos in chunkMap
+}
+
 generateManyMeshes :: proc(chunks: [dynamic]^world.Chunk) -> [dynamic]mesh.ChunkData {
     chunksData: [dynamic]mesh.ChunkData
 
@@ -119,6 +123,7 @@ frustumCulling :: proc(chunks: ^[dynamic]ChunkBuffer, camera: ^util.Camera) -> [
 
 	PV := camera.proj * camera.view
 	for chunk in chunks {
+		if !world.sqDist(chunk.pos, camera.chunk, world.VIEW_DISTANCE) do continue
 		minC := 16 * vec3{f32(chunk.pos.x), f32(chunk.pos.y), f32(chunk.pos.z)} - camera.pos
 		maxC := minC + vec3{16, 16, 16}
 		

@@ -62,21 +62,16 @@ generateChunkBlocks :: proc(^thread.Thread) {
 			continue
 		}
 
-		//skeewb.console_log(.DEBUG, "a")
-
 		append(&world.genStack, work.chunkPosition)
-		for {
-			chunk, ok := world.genPoll(work.chunkPosition, &world.allChunks)
+		skeewb.console_log(.DEBUG, "iniciar")
+		for pos in world.genStack {
+			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
 			if chunk != nil do chan.send(chunks_chan, chunk)
 		}
-		
-		// chunks := world.peak(work.chunkPosition.x, work.chunkPosition.y, work.chunkPosition.z, &world.allChunks)
-		// defer delete(chunks)
-
-		// for &chunk in chunks {
-		// 	chan.send(chunks_chan, chunk)
-		// }
+		clear_dynamic_array(&world.genStack)
+		clear_map(&world.history)
+		skeewb.console_log(.DEBUG, "finalizado")
 	}
 }
 
@@ -88,7 +83,7 @@ generateChunkMesh :: proc(^thread.Thread) {
 			if !ok {
 				break
 			}
-			chan.send(meshes_chan, mesh.generateMesh(chunk))
+			if !worldRender.testMesh(chunk.pos) do chan.send(meshes_chan, mesh.generateMesh(chunk))
 		}
 	}
 }
@@ -98,7 +93,7 @@ toReload := false
 reloadChunks :: proc() {
 	toReload = false
 
-	clear_map(&world.history)
+	// clear_map(&world.history)
 	buffer := [dynamic]worldRender.ChunkBuffer{}
 	for chunk, idx in allChunks {
 		if world.sqDist(chunk.pos, playerCamera.chunk, world.VIEW_DISTANCE) {
@@ -107,6 +102,7 @@ reloadChunks :: proc() {
 	}
 	delete(allChunks)
 	allChunks = buffer
+	// clear_dynamic_array(&allChunks)
 
 	chan.send(threadWorkChan, ThreadWork {
 		chunkPosition = playerCamera.chunk,

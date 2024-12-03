@@ -79,6 +79,7 @@ setBlock :: proc(x, y, z: i32, id: u16, c: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
         c = side
     }
 
+    c.isEmpty = false
     c.primer[x][y][z].id = id
     c.primer[x][y][z].light = {0, 0}
 }

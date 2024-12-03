@@ -7,27 +7,11 @@ Light :: struct{
     value: u8,
 }
 
-sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u8, [16][16][16]bool) {
+sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
+    if chunk.level >= .InternalLight do return
     buffer: [16][16][16][2]u8
     cache: [16][16][16]u8
     solidCache: [16][16][16]bool
-    if chunk.level != .Trees {
-        for x in 0..<16 {
-            for y in 0..<16 {
-                for z in 0..<16 {
-                    block := chunk.primer[x][y][z]
-                    id := block.id
-                    transparent := id == 7 || id == 8 || id == 9
-                    solid := id != 0 && !transparent
-                    
-                    solidCache[x][y][z] = solid
-                    buffer[x][y][z] = chunk.primer[x][y][z].light
-                }
-            }
-        }
-
-        return buffer, solidCache
-    }
     sunlightCache := [dynamic]Light{}
     defer delete(sunlightCache)
     emissiveCache := [dynamic]Light{}
@@ -45,6 +29,8 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                 solid := id != 0 && !transparent
                 
                 solidCache[x][y][z] = solid
+                buffer[x][y][z].x = 0
+                buffer[x][y][z].y = 0
 
                 if id != 0 {
                     foundGround = true
@@ -54,18 +40,19 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
                     append(&emissiveCache, Light{iVec3{i32(x), i32(y), i32(z)}, 15})
                 }
 
-                top := u8(15)
-                if y == 15 {
-                    if topChunk != nil {
-                        top = topChunk.primer[x][0][z].light.y
-                    }
-                } else {
-                    top = cache[x][y + 1][z]
-                }
+                // top := u8(15)
+                // if y == 15 {
+                //     // if topChunk != nil {
+                //     //     top = topChunk.primer[x][0][z].light.y
+                //     // }
+                //     top = 15
+                // } else {
+                //     top = cache[x][y + 1][z]
+                // }
 
                 if !foundGround {
-                    cache[x][y][z] = top
-                    append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, top})
+                    // cache[x][y][z] = top
+                    append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, 15})
                 }
             }
         }
@@ -80,6 +67,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
         y := pos.y
         z := pos.z
     
+        if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].y = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -99,6 +87,7 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
         y := pos.y
         z := pos.z
     
+        if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].x = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -112,20 +101,20 @@ sunlight :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) -> ([16][16][16][2]u
     for x in 0..<16 {
         for y in 0..<16 {
             for z in 0..<16 {
-                chunk.primer[x][y][z].light = buffer[x][y][z]
+                light := buffer[x][y][z]
+                chunk.primer[x][y][z].light = light
+                // if light.y < 0 || light.y > 15 do skeewb.console_log(.DEBUG, "%d, %d", light.y, chunk.level)
             }
         }
     }
 
     chunk.level = .InternalLight
 
-    return buffer, solidCache
+    // return buffer, solidCache
 }
 
-iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16][16]bool) {
-    buffer := buffer
-
-    if chunk.level != .InternalLight do return
+iluminate :: proc(chunk: ^Chunk) {
+    if chunk.level < .ExternalTrees do return
 
     chunks: [3][3][3]^Chunk
     for i in -1..=1 {
@@ -153,9 +142,9 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     }
 
     emissiveCache := [dynamic]Light{}
-    defer delete(emissiveCache)
+    // defer delete(emissiveCache)
     sunlightCache := [dynamic]Light{}
-    defer delete(sunlightCache)
+    // defer delete(sunlightCache)
     
     for i in -1..=1 {
         for j in -1..=1 {
@@ -191,7 +180,23 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
             }
         }
     }
-    
+
+    buffer: [16][16][16][2]u8
+    cache: [16][16][16]u8
+    solidCache: [16][16][16]bool
+    for x in 0..<16 {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                block := chunk.primer[x][y][z]
+                id := block.id
+                transparent := id == 7 || id == 8 || id == 9
+                solid := id != 0 && !transparent
+                
+                solidCache[x][y][z] = solid
+                buffer[x][y][z] = chunk.primer[x][y][z].light
+            }
+        }
+    }
     for &light in sunlightCache {
         pos := light.pos
         if solidCache[pos.x][pos.y][pos.z] do continue
@@ -201,8 +206,9 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
         y := pos.y
         z := pos.z
     
+        if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].y = light.value
-        if light.value <= 1 do continue
+        if light.value > 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
         if x != 15 do append(&sunlightCache, Light{iVec3{x + 1, y, z}, light.value - 1})
         if y !=  0 do append(&sunlightCache, Light{iVec3{x, y - 1, z}, light.value - 1})
@@ -220,8 +226,9 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
         y := pos.y
         z := pos.z
     
+        if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].x = light.value
-        if light.value <= 1 do continue
+        if light.value < 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
         if x != 15 do append(&emissiveCache, Light{iVec3{x + 1, y, z}, light.value - 1})
         if y !=  0 do append(&emissiveCache, Light{iVec3{x, y - 1, z}, light.value - 1})
@@ -239,4 +246,7 @@ iluminate :: proc(chunk: ^Chunk, buffer: [16][16][16][2]u8, solidCache: [16][16]
     }
 
     chunk.level = .ExternalLight
+
+    delete(sunlightCache)
+    delete(emissiveCache)
 }
