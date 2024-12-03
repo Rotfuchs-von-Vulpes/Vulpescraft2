@@ -63,7 +63,6 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		}
 
 		append(&world.genStack, work.chunkPosition)
-		skeewb.console_log(.DEBUG, "iniciar")
 		for pos in world.genStack {
 			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
@@ -71,7 +70,6 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
-		skeewb.console_log(.DEBUG, "finalizado")
 	}
 }
 
