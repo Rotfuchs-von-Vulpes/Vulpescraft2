@@ -208,7 +208,7 @@ iluminate :: proc(chunk: ^Chunk) {
     
         if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].y = light.value
-        if light.value > 1 do continue
+        if light.value <= 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
         if x != 15 do append(&sunlightCache, Light{iVec3{x + 1, y, z}, light.value - 1})
         if y !=  0 do append(&sunlightCache, Light{iVec3{x, y - 1, z}, light.value - 1})
@@ -228,7 +228,7 @@ iluminate :: proc(chunk: ^Chunk) {
     
         if light.value < 0 || light.value > 15 do continue
         buffer[x][y][z].x = light.value
-        if light.value < 1 do continue
+        if light.value <= 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
         if x != 15 do append(&emissiveCache, Light{iVec3{x + 1, y, z}, light.value - 1})
         if y !=  0 do append(&emissiveCache, Light{iVec3{x, y - 1, z}, light.value - 1})
