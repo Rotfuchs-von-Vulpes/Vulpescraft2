@@ -67,7 +67,7 @@ sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
         y := pos.y
         z := pos.z
     
-        if light.value < 0 || light.value > 15 do continue
+        if light.value > 15 do continue
         buffer[x][y][z].y = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -87,7 +87,7 @@ sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
         y := pos.y
         z := pos.z
     
-        if light.value < 0 || light.value > 15 do continue
+        if light.value > 15 do continue
         buffer[x][y][z].x = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -206,7 +206,7 @@ iluminate :: proc(chunk: ^Chunk) {
         y := pos.y
         z := pos.z
     
-        if light.value < 0 || light.value > 15 do continue
+        if light.value > 15 do continue
         buffer[x][y][z].y = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -226,7 +226,7 @@ iluminate :: proc(chunk: ^Chunk) {
         y := pos.y
         z := pos.z
     
-        if light.value < 0 || light.value > 15 do continue
+        if light.value > 15 do continue
         buffer[x][y][z].x = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
