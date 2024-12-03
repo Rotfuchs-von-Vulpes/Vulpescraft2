@@ -110,7 +110,6 @@ isSideExposed :: proc(primers: ^Primers, pos: iVec3, offset: iVec3) -> bool {
     }
 
     sidePos = {sidePos.x + x, sidePos.y + y, sidePos.z + z}
-    if primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1] == nil {return false}
     id := primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1].primer[sidePos.x][sidePos.y][sidePos.z].id
     return id == 0 || id == 7 || id == 8 && primers[1][1][1].primer[pos.x][pos.y][pos.z].id != 8;
 }

@@ -77,7 +77,6 @@ generateChunkBlocks :: proc(^thread.Thread) {
 
 generateChunkMesh :: proc(^thread.Thread) {
 	for !chan.is_closed(chunks_chan) {
-		chunks := [dynamic]^world.Chunk{}
 		for {
 			chunk, ok := chan.try_recv(chunks_chan)
 			if !ok {

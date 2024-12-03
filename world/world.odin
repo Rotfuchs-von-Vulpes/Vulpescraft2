@@ -186,11 +186,12 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool
     count := 0
     if chunk.level != .ExternalLight {
         for i in -1..=1 {
-            for k in -1..=1 {
+            loop: for k in -1..=1 {
                 j := -1
                 c: ^Chunk
                 for {
                     c = eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                    if c.level == .ExternalLight do continue loop
                     for &cSide, dir in c.sides {
                         offset := posOffsets[dir]
                         cSide = eval(c.pos.x + offset.x, c.pos.y + offset.y, c.pos.z + offset.z, tempMap)

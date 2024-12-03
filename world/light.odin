@@ -142,9 +142,9 @@ iluminate :: proc(chunk: ^Chunk) {
     }
 
     emissiveCache := [dynamic]Light{}
-    // defer delete(emissiveCache)
+    defer delete(emissiveCache)
     sunlightCache := [dynamic]Light{}
-    // defer delete(sunlightCache)
+    defer delete(sunlightCache)
     
     for i in -1..=1 {
         for j in -1..=1 {
@@ -246,7 +246,4 @@ iluminate :: proc(chunk: ^Chunk) {
     }
 
     chunk.level = .ExternalLight
-
-    delete(sunlightCache)
-    delete(emissiveCache)
 }
