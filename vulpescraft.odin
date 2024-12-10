@@ -218,8 +218,9 @@ main :: proc() {
 	thread.start(meshGenereatorThread)
 	reloadChunks()
 
+	looking := true
+
 	loop: for {
-		tracy.FrameMark()
 		duration := time.tick_since(start_tick)
 		deltaTime := f32(time.duration_milliseconds(duration))
 
@@ -241,6 +242,9 @@ main :: proc() {
 						toRight = false
 					case .F1:
 						toDebug = !toDebug
+					case .E:
+						looking = !looking
+						if looking do sdl2.SetRelativeMouseMode(true); else do sdl2.SetRelativeMouseMode(false)
 				}
 			} else if event.type == .KEYDOWN {
 				#partial switch (event.key.keysym.sym) {
@@ -255,7 +259,7 @@ main :: proc() {
 					case .D:
 						toRight = true
 				}
-			} else if event.type == .MOUSEMOTION {
+			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
 				ypos := -f32(event.motion.yrel)
 			
@@ -295,6 +299,16 @@ main :: proc() {
 				playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 				if chunks != nil {delete(chunks)}
 				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
+			} else if event.type == .WINDOWEVENT {
+				if event.window.event == .RESIZED {
+					screenWidth = event.window.data1
+					screenHeight = event.window.data2
+					skeewb.console_log(.DEBUG, "%d, %d", screenWidth, screenHeight)
+					playerCamera.viewPort.x = 2 * f32(screenWidth)
+					playerCamera.viewPort.y = 2 * f32(screenHeight)
+					playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
+					frameBuffer.resize(&playerCamera, fboRender)
+				}
 			} /*else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
 					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)

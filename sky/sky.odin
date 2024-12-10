@@ -84,7 +84,7 @@ draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
 		math.matrix4_translate_f32(pos) * 
 		math.matrix4_rotate_f32(0.5 * math.PI - math.atan2(math.length(pos.xz), pos.y), -math.normalize(math.cross(vec3{0, 1, 0}, camera.front))) * 
 		math.matrix4_rotate_f32(-0.5 * math.PI - math.atan2(pos.z, pos.x), {0, 1, 0}) * 
-		math.matrix4_scale(vec3{1, camera.viewPort.y / camera.viewPort.x, 0})
+		math.matrix4_scale(vec3{camera.viewPort.x / camera.viewPort.y, 1, 0})
     gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])

@@ -92,6 +92,14 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 	//gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
 }
 
+resize :: proc(camera: ^util.Camera, render: Render) {
+	gl.BindTexture(gl.TEXTURE_2D, render.texture)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	
+	gl.BindTexture(gl.TEXTURE_2D, render.depth)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
+}
+
 draw :: proc(render: Render) {
 	gl.Disable(gl.DEPTH_TEST)
 
