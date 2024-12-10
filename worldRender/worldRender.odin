@@ -53,7 +53,7 @@ setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
     return ChunkBuffer{data.pos, {}, data, blocksBuffer, waterBuffer}
 }
 
-eval :: proc(chunk: world.Chunk) -> mesh.ChunkData {
+eval :: proc(chunk: ^world.Chunk) -> mesh.ChunkData {
     pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
     chunkBuffer, ok, _ := util.map_force_get(&dataChunks, pos)
     if ok {

@@ -52,7 +52,7 @@ ThreadWork :: struct {
 }
 
 threadWorkChan: chan.Chan(ThreadWork)
-chunks_chan: chan.Chan(world.Chunk)
+chunks_chan: chan.Chan(^world.Chunk)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
 generateChunkBlocks :: proc(^thread.Thread) {
@@ -66,8 +66,10 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		for pos in world.genStack {
 			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
-			if !world.history[chunk.pos] do chan.send(chunks_chan, chunk)
-			world.history[chunk.pos] = true
+			if chunk != nil && !world.history[chunk.pos] {
+				chan.send(chunks_chan, chunk)
+				world.history[chunk.pos] = true
+			} 
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
@@ -121,7 +123,7 @@ main :: proc() {
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
-	chunks_chan, err = chan.create_buffered(chan.Chan(world.Chunk), 8 * 8, chunksAllocator)
+	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()

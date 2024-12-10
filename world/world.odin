@@ -157,38 +157,10 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     }
 }
 
-genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (Chunk, bool) {
-    if history[pos] do return {}, true
-    // history[pos] = true
+genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool) {
+    if history[pos] do return nil, true
     chunk := eval(pos.x, pos.y, pos.z, tempMap)
     if chunk.level != .ExternalLight {
-        /*for i in -2..=2 {
-            for k in -2..=2 {
-                j := -2
-                for {
-                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    populate(c, tempMap)
-                    j += 1
-                    if j > 2 do break
-                }
-                for {
-                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    sunlight(c)
-                    j -= 1
-                    if j < -2 do break
-                }
-            }
-        }
-        for i in -1..=1 {
-            for j in -1..=1 {
-                for k in -1..=1 {
-                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    c.level = .ExternalTrees
-                    calcSides(c, tempMap)
-                    iluminate(c)
-                }
-            }
-        }*/
         for i in -2..=2 {
             for j in -2..=2 {
                 for k in -2..=2 {
@@ -229,7 +201,7 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (Chunk, bool)
         append(&genStack, iVec3{pos.x, pos.y, pos.z + 1})
     }
 
-    return chunk^, true
+    return chunk, true
 }
 
 nuke :: proc() {
