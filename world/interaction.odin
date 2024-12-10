@@ -41,25 +41,25 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
 
         if lastBlock != iPos {
             chunk, pos = getPosition(iPos)
-            if ok && chunk.primer[pos.x][pos.y][pos.z].id != 0 {
+            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
                 if place {
                     offset := iPos - lastBlock
                     if abs(offset.x) + abs(offset.y) + abs(offset.z) != 1 {
                         if offset.x != 0 {
                             chunk, pos = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
-                            if ok && chunk.primer[pos.x][pos.y][pos.z].id != 0 {
+                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.y != 0 {
                             chunk, pos = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
-                            if ok && chunk.primer[pos.x][pos.y][pos.z].id != 0 {
+                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
                                 return chunk, pos, true
                             }
                         }
                         if offset.z != 0 {
                             chunk, pos = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
-                            if ok && chunk.primer[pos.x][pos.y][pos.z].id != 0 {
+                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
                                 return chunk, pos, true
                             }
                         }
@@ -149,7 +149,7 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk, pos, ok := raycast(origin, direction, false)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x][pos.y][pos.z].id = 0
+    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 0
     if pos.x == 0 {
         chunk.opened += {.West}
     } else if pos.x == 15 {
@@ -176,7 +176,7 @@ place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     chunk, pos, ok := raycast(origin, direction, true)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x][pos.y][pos.z].id = 5
+    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 5
     if pos.x == 0 {
         chunk.opened += {.West}
     } else if pos.x == 15 {

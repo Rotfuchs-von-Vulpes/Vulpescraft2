@@ -293,7 +293,7 @@ main :: proc() {
 				playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 				if chunks != nil {delete(chunks)}
 				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
-			} else if event.type == .MOUSEBUTTONDOWN {
+			} /*else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
 					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
@@ -309,7 +309,7 @@ main :: proc() {
 						reloadChunks()
 					}
 				}
-			}
+			}*/
 		}
 
 		scale: [3]f32 = {0, 0, 0}
