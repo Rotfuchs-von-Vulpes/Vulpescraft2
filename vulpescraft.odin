@@ -305,7 +305,6 @@ main :: proc() {
 				if event.window.event == .RESIZED {
 					screenWidth = event.window.data1
 					screenHeight = event.window.data2
-					skeewb.console_log(.DEBUG, "%d, %d", screenWidth, screenHeight)
 					playerCamera.viewPort.x = 2 * f32(screenWidth)
 					playerCamera.viewPort.y = 2 * f32(screenHeight)
 					playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
