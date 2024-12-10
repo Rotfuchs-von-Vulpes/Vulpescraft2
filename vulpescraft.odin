@@ -64,6 +64,8 @@ generateChunkBlocks :: proc(^thread.Thread) {
 
 		append(&world.genStack, work.chunkPosition)
 		for pos in world.genStack {
+			work2, ok2 := chan.try_recv(threadWorkChan)
+			if ok2 do work = work2
 			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
 			if chunk != nil && !world.history[chunk.pos] {
