@@ -67,7 +67,7 @@ generateChunkBlocks :: proc(^thread.Thread) {
 			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
 			if chunk != nil && !world.history[chunk.pos] {
-				chan.send(chunks_chan, chunk)
+				if !chunk.isEmpty do chan.send(chunks_chan, chunk)
 				world.history[chunk.pos] = true
 			} 
 		}

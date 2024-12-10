@@ -165,7 +165,7 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool
             for j in -2..=2 {
                 for k in -2..=2 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    populate(c, tempMap)
+                    if !c.isEmpty do populate(c, tempMap)
                 }
             }
         }
@@ -173,7 +173,11 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool
             for j in -1..=1 {
                 for k in -1..=1 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    sunlight(c)
+                    if c.isEmpty {
+                        allLight(c)
+                    } else {
+                        sunlight(c)
+                    }
                 }
             }
         }

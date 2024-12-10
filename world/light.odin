@@ -7,7 +7,17 @@ Light :: struct{
     value: u8,
 }
 
-sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
+allLight :: proc(chunk: ^Chunk) {
+    for x in 0..<16 {
+        for y in 0..<16 {
+            for z in 0..<16 {
+                chunk.primer[x + 1][y + 1][z + 1].light = {0, 15}
+            }
+        }
+    }
+}
+
+sunlight :: proc(chunk: ^Chunk) {
     if chunk.level != .Trees do return
     cache: [16][16][16]u8
     solidCache: [16][16][16]bool
