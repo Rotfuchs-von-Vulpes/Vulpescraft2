@@ -56,18 +56,13 @@ sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
     }
     
     for light in sunlightCache {
-        pos := light.pos
-        if solidCache[pos.x][pos.y][pos.z] do continue
-        if chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].light.y >= light.value do continue
+        x := light.pos.x
+        y := light.pos.y
+        z := light.pos.z
+        if solidCache[x][y][z] do continue
+        if chunk.primer[x + 1][y + 1][z + 1].light.y >= light.value do continue
     
-        x := pos.x
-        y := pos.y
-        z := pos.z
     
-        if light.value > 15 {
-            skeewb.console_log(.DEBUG, "%d, %d, %d", x, y, z)
-            continue
-        }
         chunk.primer[x + 1][y + 1][z + 1].light.y = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&sunlightCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -79,15 +74,12 @@ sunlight :: proc(chunk: ^Chunk) /*-> ([16][16][16][2]u8, [16][16][16]bool)*/ {
     }
     
     for light in emissiveCache {
-        pos := light.pos
-        if solidCache[pos.x][pos.y][pos.z] do continue
-        if chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].light.x >= light.value do continue
+        x := light.pos.x
+        y := light.pos.y
+        z := light.pos.z
+        if solidCache[x][y][z] do continue
+        if chunk.primer[x + 1][y + 1][z + 1].light.x >= light.value do continue
     
-        x := pos.x
-        y := pos.y
-        z := pos.z
-    
-        if light.value > 15 do continue
         chunk.primer[x + 1][y + 1][z + 1].light.x = light.value
         if light.value <= 1 do continue
         if x !=  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
@@ -115,38 +107,8 @@ iluminate :: proc(chunk: ^Chunk) {
                 if x > 0 && x < 17 && y > 0 && y < 17 && z > 0 && z < 17 do continue
                 light := chunk.primer[x][y][z].light
                 chunk.primer[x][y][z].light = {0, 0}
-                xx := i32(x) - 1 
-                yy := i32(y) - 1 
-                zz := i32(z) - 1 
-                ox: i32 = 0
-                oy: i32 = 0
-                oz: i32 = 0
-                count: u8 = 0
-                if x == 0 {
-                    ox = 1
-                    count += 1
-                } else if x == 17 {
-                    ox = -1
-                    count += 1
-                }
-                if y == 0 {
-                    oy = 1
-                    count += 1
-                } else if y == 17 {
-                    oy = -1
-                    count += 1
-                }
-                if z == 0 {
-                    oz = 1
-                    count += 1
-                } else if z == 17 {
-                    oz = -1
-                    count += 1
-                }
-                // if light.y > count + 1 do append(&sunlightCache, Light{iVec3{xx + ox, yy + oy, zz + oz}, light.y - count})
-                // if light.x > count + 1 do append(&emissiveCache, Light{iVec3{xx + ox, yy + oy, zz + oz}, light.x - count})
-                if light.y > 1 do append(&sunlightCache, Light{iVec3{xx, yy, zz}, light.y})
-                if light.x > 1 do append(&emissiveCache, Light{iVec3{xx, yy, zz}, light.x})
+                if light.y > 1 do append(&sunlightCache, Light{iVec3{i32(x) - 1, i32(y) - 1, i32(z) - 1}, light.y})
+                if light.x > 1 do append(&emissiveCache, Light{iVec3{i32(x) - 1, i32(y) - 1, i32(z) - 1}, light.x})
             }
         }
     }
@@ -165,16 +127,14 @@ iluminate :: proc(chunk: ^Chunk) {
         }
     }
     for light in sunlightCache {
-        pos := light.pos
-        x := pos.x
-        y := pos.y
-        z := pos.z
+        x := light.pos.x
+        y := light.pos.y
+        z := light.pos.z
         insideChunk := x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16
 
         if insideChunk && solidCache[x][y][z] do continue
         if chunk.primer[x + 1][y + 1][z + 1].light.y >= light.value do continue
     
-        if light.value > 15 do continue
         chunk.primer[x + 1][y + 1][z + 1].light.y = light.value
         if light.value <= 1 do continue
 
@@ -187,15 +147,13 @@ iluminate :: proc(chunk: ^Chunk) {
     }
     
     for light in emissiveCache {
-        pos := light.pos
-        x := pos.x
-        y := pos.y
-        z := pos.z
+        x := light.pos.x
+        y := light.pos.y
+        z := light.pos.z
         insideChunk := x >= 0 && x < 16 && y >= 0 && y < 16 && z >= 0 && z < 16
         if insideChunk && solidCache[x][y][z] do continue
         if chunk.primer[x + 1][y + 1][z + 1].light.x >= light.value do continue
     
-        if light.value > 15 do continue
         chunk.primer[x + 1][y + 1][z + 1].light.x = light.value
         if light.value <= 1 do continue
         if x >  0 do append(&emissiveCache, Light{iVec3{x - 1, y, z}, light.value - 1})
