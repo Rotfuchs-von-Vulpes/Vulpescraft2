@@ -17,7 +17,7 @@ blockState :: struct {
     id: u16,
     light: [2]u8,
 }
-Primer :: [16][16][16]blockState
+Primer :: [18][18][18]blockState
 
 Direction :: enum {Up, Bottom, North, South, East, West}
 FaceSet :: bit_set[Direction]
@@ -26,7 +26,6 @@ FaceSet :: bit_set[Direction]
 GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, ExternalTrees, ExternalLight}
 Chunk :: struct {
     pos: iVec3,
-    sides: [Direction]^Chunk,
     primer: Primer,
     opened: FaceSet,
     level: GeneratePhase,
@@ -34,10 +33,6 @@ Chunk :: struct {
 }
 
 allChunks := make(map[iVec3]^Chunk)
-chunkMap := make(map[iVec3]int)
-nodeMap := make(map[iVec3]int)
-blocked := make(map[iVec3]bool)
-populated := make(map[iVec3]bool)
 
 getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
     empty: blockState = {
@@ -48,14 +43,6 @@ getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
     chunk.level = .Empty
     chunk.opened = {}
     chunk.pos = {x, y, z}
-    chunk.sides = {
-        .Up = nil,
-        .Bottom = nil,
-        .North = nil,
-        .South = nil,
-        .East = nil,
-        .West = nil
-    }
     chunk.isEmpty = true
 }
 
@@ -67,7 +54,7 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
             localHeight := height - int(chunk.pos.y) * 16
             topHeight := min(height, 15)
             for k in 0..<16 {
-                chunk.primer[i][k][j].light = {0, 0}
+                chunk.primer[i + 1][k + 1][j + 1].light = {0, 0}
                 if k >= localHeight {
                     if k == 0 {
                         chunk.opened += {.Bottom}
@@ -89,22 +76,22 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
                     empty = false
                     if height > 15 {
                         if localHeight - k > 4 {
-                            chunk.primer[i][k][j].id = 1
+                            chunk.primer[i + 1][k + 1][j + 1].id = 1
                         } else if localHeight - k > 1 {
-                            chunk.primer[i][k][j].id = 2
+                            chunk.primer[i + 1][k + 1][j + 1].id = 2
                         } else {
-                            chunk.primer[i][k][j].id = 3
+                            chunk.primer[i + 1][k + 1][j + 1].id = 3
                         }
                     } else {
                         if localHeight - k > 3 {
-                            chunk.primer[i][k][j].id = 1
+                            chunk.primer[i + 1][k + 1][j + 1].id = 1
                         } else {
-                            chunk.primer[i][k][j].id = 4
+                            chunk.primer[i + 1][k + 1][j + 1].id = 4
                         }
                     }
                 } else if chunk.pos.y <= 0 && k < 15 {
                     empty = false
-                    chunk.primer[i][k][j].id = 8
+                    chunk.primer[i + 1][k + 1][j + 1].id = 8
                 } else {
                     break
                 }
@@ -133,85 +120,93 @@ length :: proc(v: iVec3) -> i32 {
 
 VIEW_DISTANCE :: 7
 
-addWorm :: proc(pos, center: iVec3, history: ^map[iVec3]bool) -> bool {
-    if abs(pos.x - center.x) > VIEW_DISTANCE || abs(pos.y - center.y) > VIEW_DISTANCE || abs(pos.z - center.z) > VIEW_DISTANCE {return false}
-
-    if pos in history {return false}
-
-    history[pos] = true
-
-    return true
-}
-
-hasAllSides :: proc(chunk: ^Chunk) -> bool {
-    for side in chunk.sides {
-        if side == nil do return false
-    }
-
-    return true
-}
-
 sqDist :: proc(pos1, pos2: iVec3, dist: int) -> bool {
     diff := pos1 - pos2
     return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z < i32(dist * dist)
 }
 
-prevCenter: iVec3
 history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
-posOffsets: [Direction]iVec3 = {
-    .West   = {-1, 0, 0},
-    .East   = {1, 0, 0},
-    .Bottom = {0, -1, 0},
-    .Up     = {0, 1, 0},
-    .South  = {0, 0, -1},
-    .North  = {0, 0, 1},
-}
-opposite: [Direction]Direction = {
-    .West   = .East,
-    .East   = .West,
-    .Bottom = .Up,
-    .Up     = .Bottom,
-    .South  = .North,
-    .North  = .South,
-}
+calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
+    if chunk.level != .ExternalTrees do return
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), tempMap)
 
-idx := 0
-
-genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool) {
-    history[pos] = true
-    prevCenter = center
-    chunk := eval(pos.x, pos.y, pos.z, tempMap)
-    count := 0
-    if chunk.level != .ExternalLight {
-        for i in -1..=1 {
-            loop: for k in -1..=1 {
-                j := -1
-                c: ^Chunk
-                for {
-                    c = eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    if c.level == .ExternalLight do continue loop
-                    for &cSide, dir in c.sides {
-                        offset := posOffsets[dir]
-                        cSide = eval(c.pos.x + offset.x, c.pos.y + offset.y, c.pos.z + offset.z, tempMap)
+                if i == 0 && j == 0 && k == 0 do continue
+                for x in 0..<16 {
+                    if i == 1 && x != 0 do continue
+                    if i == -1 && x != 15 do continue
+                    for y in 0..<16 {
+                        if j == 1 && y != 0 do continue
+                        if j == -1 && y != 15 do continue
+                        for z in 0..<16 {
+                            if k == 1 && z != 0 do continue
+                            if k == -1 && z != 15 do continue
+                            xx := i != 0 ? i < 0 ? 0 : 17 : x + 1
+                            yy := j != 0 ? j < 0 ? 0 : 17 : y + 1
+                            zz := k != 0 ? k < 0 ? 0 : 17 : z + 1
+                            chunk.primer[xx][yy][zz] = c.primer[x + 1][y + 1][z + 1]
+                        }
                     }
+                }
+            }
+        }
+    }
+}
+
+genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (Chunk, bool) {
+    if history[pos] do return {}, true
+    // history[pos] = true
+    chunk := eval(pos.x, pos.y, pos.z, tempMap)
+    if chunk.level != .ExternalLight {
+        /*for i in -2..=2 {
+            for k in -2..=2 {
+                j := -2
+                for {
+                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
                     populate(c, tempMap)
-                    if c.isEmpty && j > 1 do break
                     j += 1
-                    // sunlight(c)
-                    // sunlight(c, tempMap)
-                    //c.isEmpty = false
+                    if j > 2 do break
                 }
                 for {
-                    c = eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
                     sunlight(c)
                     j -= 1
-                    if .Bottom not_in c.opened do break
+                    if j < -2 do break
+                }
+            }
+        }
+        for i in -1..=1 {
+            for j in -1..=1 {
+                for k in -1..=1 {
+                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                    c.level = .ExternalTrees
+                    calcSides(c, tempMap)
+                    iluminate(c)
+                }
+            }
+        }*/
+        for i in -2..=2 {
+            for j in -2..=2 {
+                for k in -2..=2 {
+                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                    populate(c, tempMap)
+                }
+            }
+        }
+        for i in -1..=1 {
+            for j in -1..=1 {
+                for k in -1..=1 {
+                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                    sunlight(c)
                 }
             }
         }
         chunk.level = .ExternalTrees
+        calcSides(chunk, tempMap)
         iluminate(chunk)
     }
 
@@ -234,10 +229,9 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool
         append(&genStack, iVec3{pos.x, pos.y, pos.z + 1})
     }
 
-    return chunk, true
+    return chunk^, true
 }
 
 nuke :: proc() {
-    delete(chunkMap)
     delete(allChunks)
 }

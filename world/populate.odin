@@ -2,86 +2,41 @@ package world
 
 import "core:math"
 import "core:math/rand"
+import "../skeewb"
 
 setBlock :: proc(x, y, z: i32, id: u16, c: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     x := x; y := y; z := z; c := c
+    ox, oy, oz: i32
 
     for x >= 16 {
+        ox += 1
         x -= 16
-        side := c.sides[.East]
-        if side == nil {
-            side = eval(c.pos.x + 1, c.pos.y, c.pos.z, tempMap)
-            c.sides[.East] = side
-        }
-        if .East not_in c.opened {
-            c.opened += {.East}
-        }
-        c = side
     }
     for x < 0 {
+        ox -= 1
         x += 16
-        side := c.sides[.West]
-        if side == nil {
-            side = eval(c.pos.x - 1, c.pos.y, c.pos.z, tempMap)
-            c.sides[.West] = side
-        }
-        if .West not_in c.opened {
-            c.opened += {.West}
-        }
-        c = side
     }
     for y >= 16 {
+        oy += 1
         y -= 16
-        side := c.sides[.Up]
-        if side == nil {
-            side = eval(c.pos.x, c.pos.y + 1, c.pos.z, tempMap)
-            c.sides[.Up] = side
-        }
-        if .Up not_in c.opened {
-            c.opened += {.Up}
-        }
-        c = side
     }
     for y < 0 {
+        oy -= 1
         y += 16
-        side := c.sides[.Bottom]
-        if side == nil {
-            side = eval(c.pos.x, c.pos.y - 1, c.pos.z, tempMap)
-            c.sides[.Bottom] = side
-        }
-        if .Bottom not_in c.opened {
-            c.opened += {.Bottom}
-        }
-        c = side
     }
     for z >= 16 {
+        oz += 1
         z -= 16
-        side := c.sides[.North]
-        if side == nil {
-            side = eval(c.pos.x, c.pos.y, c.pos.z + 1, tempMap)
-            c.sides[.North] = side
-        }
-        if .North not_in c.opened {
-            c.opened += {.North}
-        }
-        c = side
     }
     for z < 0 {
+        oz -= 1
         z += 16
-        side := c.sides[.South]
-        if side == nil {
-            side = eval(c.pos.x, c.pos.y, c.pos.z - 1, tempMap)
-            c.sides[.South] = side
-        }
-        if .South not_in c.opened {
-            c.opened += {.South}
-        }
-        c = side
     }
 
+    if x != 0 || y != 0 || z != 0 do c = eval(c.pos.x + ox, c.pos.y + oy, c.pos.z + oz, tempMap)
+
     c.isEmpty = false
-    c.primer[x][y][z].id = id
-    c.primer[x][y][z].light = {0, 0}
+    c.primer[x + 1][y + 1][z + 1].id = id
 }
 
 placeTree :: proc(x, y, z: i32, c: ^Chunk, tempMap: ^map[iVec3]^Chunk, rnd: f32) {
@@ -142,7 +97,7 @@ populate :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
         y0: u32 = 0
         for j in 0..<16 {
             y0 = u32(j)
-            if chunk.primer[x0][j][z0].id == 3 {
+            if chunk.primer[x0 + 1][j + 1][z0 + 1].id == 3 {
                 toPlace = true
                 break
             }

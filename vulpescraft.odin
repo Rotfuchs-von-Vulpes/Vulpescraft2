@@ -52,7 +52,7 @@ ThreadWork :: struct {
 }
 
 threadWorkChan: chan.Chan(ThreadWork)
-chunks_chan: chan.Chan(^world.Chunk)
+chunks_chan: chan.Chan(world.Chunk)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
 generateChunkBlocks :: proc(^thread.Thread) {
@@ -66,7 +66,8 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		for pos in world.genStack {
 			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
 			if !ok do break
-			if chunk != nil do chan.send(chunks_chan, chunk)
+			if !world.history[chunk.pos] do chan.send(chunks_chan, chunk)
+			world.history[chunk.pos] = true
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
@@ -76,11 +77,11 @@ generateChunkBlocks :: proc(^thread.Thread) {
 generateChunkMesh :: proc(^thread.Thread) {
 	for !chan.is_closed(chunks_chan) {
 		for {
-			chunk, ok := chan.try_recv(chunks_chan)
+			chunk, ok := chan.recv(chunks_chan)
 			if !ok {
 				break
 			}
-			if !worldRender.testMesh(chunk.pos) do chan.send(meshes_chan, mesh.generateMesh(chunk))
+			chan.send(meshes_chan, worldRender.eval(chunk))
 		}
 	}
 }
@@ -90,16 +91,19 @@ toReload := false
 reloadChunks :: proc() {
 	toReload = false
 
-	// clear_map(&world.history)
-	buffer := [dynamic]worldRender.ChunkBuffer{}
+	clear_map(&world.history)
+	buffer := [dynamic]int{}
+	defer delete(buffer)
 	for chunk, idx in allChunks {
-		if world.sqDist(chunk.pos, playerCamera.chunk, world.VIEW_DISTANCE) {
-			append(&buffer, chunk)
+		if !world.sqDist(chunk.pos, playerCamera.chunk, world.VIEW_DISTANCE) {
+			append(&buffer, idx)
 		}
 	}
-	delete(allChunks)
-	allChunks = buffer
+	#reverse for idx in buffer {
+		unordered_remove(&allChunks, idx)
+	}
 	// clear_dynamic_array(&allChunks)
+	// allChunks = buffer
 
 	chan.send(threadWorkChan, ThreadWork {
 		chunkPosition = playerCamera.chunk,
@@ -116,9 +120,9 @@ main :: proc() {
 
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
-	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 1024 * 1024, chunksAllocator)
-	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 1024 * 1024, chunksAllocator)
-	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 1024 * 1024, chunksAllocator)
+	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
+	chunks_chan, err = chan.create_buffered(chan.Chan(world.Chunk), 8 * 8, chunksAllocator)
+	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -369,7 +373,7 @@ main :: proc() {
 					break
 				}
 				done = true
-				append(&allChunks, worldRender.eval(chunk))
+				append(&allChunks, worldRender.setup(chunk))
 			}
 
 			if done {

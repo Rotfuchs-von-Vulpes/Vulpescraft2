@@ -71,72 +71,34 @@ toVec3 :: proc(vec: iVec3) -> vec3 {
     return vec3{f32(vec.x), f32(vec.y), f32(vec.z)}
 }
 
-isSideExposed :: proc(primers: ^Primers, pos: iVec3, offset: iVec3) -> bool {
-    x := offset.x
-    y := offset.y
-    z := offset.z
-    sidePos := pos
-
-    chunkXOffset := 0
-    chunkYOffset := 0
-    chunkZOffset := 0
-
-    if offset.x < 0 && pos.x == 0 {
-        sidePos = {15, sidePos.y, sidePos.z}
-        x = 0
-        chunkXOffset = -1
-    } else if offset.x > 0 && pos.x >= 15 {
-        sidePos = {0, sidePos.y, sidePos.z}
-        x = 0
-        chunkXOffset = 1
-    }
-    if offset.y < 0 && pos.y == 0 {
-        sidePos = {sidePos.x, 15, sidePos.z}
-        y = 0
-        chunkYOffset = -1
-    } else if offset.y > 0 && pos.y >= 15 {
-        sidePos = {sidePos.x, 0, sidePos.z}
-        y = 0
-        chunkYOffset = 1
-    }
-    if offset.z < 0 && pos.z == 0 {
-        z = 0
-        sidePos = {sidePos.x, sidePos.y, 15}
-        chunkZOffset = -1
-    } else if offset.z > 0 && pos.z >= 15 {
-        z = 0
-        sidePos = {sidePos.x, sidePos.y, 0}
-        chunkZOffset = 1
-    }
-
-    sidePos = {sidePos.x + x, sidePos.y + y, sidePos.z + z}
-    id := primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1].primer[sidePos.x][sidePos.y][sidePos.z].id
-    return id == 0 || id == 7 || id == 8 && primers[1][1][1].primer[pos.x][pos.y][pos.z].id != 8;
+isSideExposed :: proc(chunk: world.Chunk, pos: iVec3, offset: iVec3) -> bool {
+    id := chunk.primer[pos.x + offset.x + 1][pos.y + offset.y + 1][pos.z + offset.z + 1].id
+    return id == 0 || id == 7 || id == 8 && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 8;
 }
 
-hasSideExposed :: proc(primers: ^Primers, pos: iVec3) -> bool {
-    if isSideExposed(primers, pos, {-1, 0, 0}) {return true}
-    if isSideExposed(primers, pos, { 1, 0, 0}) {return true}
-    if isSideExposed(primers, pos, { 0,-1, 0}) {return true}
-    if isSideExposed(primers, pos, { 0, 1, 0}) {return true}
-    if isSideExposed(primers, pos, { 0, 0,-1}) {return true}
-    if isSideExposed(primers, pos, { 0, 0, 1}) {return true}
+hasSideExposed :: proc(chunk: world.Chunk, pos: iVec3) -> bool {
+    if isSideExposed(chunk, pos, {-1, 0, 0}) {return true}
+    if isSideExposed(chunk, pos, { 1, 0, 0}) {return true}
+    if isSideExposed(chunk, pos, { 0,-1, 0}) {return true}
+    if isSideExposed(chunk, pos, { 0, 1, 0}) {return true}
+    if isSideExposed(chunk, pos, { 0, 0,-1}) {return true}
+    if isSideExposed(chunk, pos, { 0, 0, 1}) {return true}
 
     return false
 }
 
-filterCubes :: proc(primers: ^Primers) -> [dynamic]Cube {
+filterCubes :: proc(chunk: world.Chunk) -> [dynamic]Cube {
     filtered := [dynamic]Cube{}
 
     for i: i32 = 0; i < 16; i += 1 {
         for j: i32 = 0; j < 16; j += 1 {
             for k: i32 = 0; k < 16; k += 1 {
                 pos: iVec3 = {i, j, k}
-                id := primers[1][1][1].primer[i][j][k].id
+                id := chunk.primer[i + 1][j + 1][k + 1].id
 
                 if id == 0 {continue}
 
-                if hasSideExposed(primers, pos) {append(&filtered, Cube{u32(id), pos})}
+                if hasSideExposed(chunk, pos) {append(&filtered, Cube{u32(id), pos})}
             }
         }
     }
@@ -144,19 +106,19 @@ filterCubes :: proc(primers: ^Primers) -> [dynamic]Cube {
     return filtered
 }
 
-makeCubes :: proc(primers: ^Primers, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
+makeCubes :: proc(chunk: world.Chunk, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
     cubesFaces := [dynamic]CubeFaces{}
 
     for cube in cubes {
         pos := cube.pos
         faces := FaceSet{}
 
-        if isSideExposed(primers, pos, {-1, 0, 0}) {faces = faces + {.West}};
-        if isSideExposed(primers, pos, { 1, 0, 0}) {faces = faces + {.East}};
-        if isSideExposed(primers, pos, { 0,-1, 0}) {faces = faces + {.Bottom}};
-        if isSideExposed(primers, pos, { 0, 1, 0}) {faces = faces + {.Up}};
-        if isSideExposed(primers, pos, { 0, 0,-1}) {faces = faces + {.South}};
-        if isSideExposed(primers, pos, { 0, 0, 1}) {faces = faces + {.North}};
+        if isSideExposed(chunk, pos, {-1, 0, 0}) {faces = faces + {.West}};
+        if isSideExposed(chunk, pos, { 1, 0, 0}) {faces = faces + {.East}};
+        if isSideExposed(chunk, pos, { 0,-1, 0}) {faces = faces + {.Bottom}};
+        if isSideExposed(chunk, pos, { 0, 1, 0}) {faces = faces + {.Up}};
+        if isSideExposed(chunk, pos, { 0, 0,-1}) {faces = faces + {.South}};
+        if isSideExposed(chunk, pos, { 0, 0, 1}) {faces = faces + {.North}};
 
         append(&cubesFaces, CubeFaces{cube.id, pos, faces})
     }
@@ -224,7 +186,7 @@ getBlockPos :: proc(primers: Primers, pos: iVec3) -> (^world.Chunk, iVec3, bool)
     return primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1], finalPos, true
 }
 
-getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Primers) -> [2]f32 {
+getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, chunk: world.Chunk) -> [2]f32 {
     normal: iVec3
 
     switch direction {
@@ -258,18 +220,17 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Prime
         side2Pos = posV + {0, signY, signZ}
     }
 
-    cornerPrimer, cornerPos, _ := getBlockPos(primers, posV + {signX, signY, signZ})
-    side1Primer, side1Pos2, _ := getBlockPos(primers, side1Pos)
-    side2Primer, side2Pos2, _ := getBlockPos(primers, side2Pos)
-    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z]
-    side1 := side1Primer.primer[side1Pos2.x][side1Pos2.y][side1Pos2.z]
-    side2 := side2Primer.primer[side2Pos2.x][side2Pos2.y][side2Pos2.z]
+    cornerPos := posV + {signX, signY, signZ}
+    side1Pos2 := side1Pos
+    side2Pos2 := side2Pos
+    corner := chunk.primer[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1]
+    side1 := chunk.primer[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1]
+    side2 := chunk.primer[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1]
 
-    chunk, normalPos, _ := getBlockPos(primers, posV + normal)
-    light := chunk.primer[normalPos.x][normalPos.y][normalPos.z].light
+    normalPos := posV + normal
+    light := chunk.primer[normalPos.x + 1][normalPos.y + 1][normalPos.z + 1].light
     blockLight := f32(light.x)
     sunLight := f32(light.y)
-    count := f32(0)
     if side1.id == 0 || side1.id == 9 {
         blockLight = max(blockLight, f32(side1.light.x))
         sunLight = max(sunLight, f32(side1.light.y))
@@ -285,7 +246,7 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, primers: Prime
     return {f32(blockLight), f32(sunLight)}
 }
 
-getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, primers: Primers) -> f32 {
+getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, chunk: world.Chunk) -> f32 {
     normal: iVec3
 
     switch direction {
@@ -319,12 +280,12 @@ getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, primers: Primers) 
         side2Pos = posV + {0, signY, signZ}
     }
 
-    cornerPrimer, cornerPos, _ := getBlockPos(primers, posV + {signX, signY, signZ})
-    side1Primer, side1Pos2, _ := getBlockPos(primers, side1Pos)
-    side2Primer, side2Pos2, _ := getBlockPos(primers, side2Pos)
-    corner := cornerPrimer.primer[cornerPos.x][cornerPos.y][cornerPos.z].id
-    side1 := side1Primer.primer[side1Pos2.x][side1Pos2.y][side1Pos2.z].id
-    side2 := side2Primer.primer[side2Pos2.x][side2Pos2.y][side2Pos2.z].id
+    cornerPos := posV + {signX, signY, signZ}
+    side1Pos2 := side1Pos
+    side2Pos2 := side2Pos
+    corner := chunk.primer[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1].id
+    side1 := chunk.primer[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1].id
+    side2 := chunk.primer[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1].id
 
     if corner == 8 {corner = 0}
     if side1 == 8 {side1 = 0}
@@ -346,32 +307,32 @@ makeCorners :: proc(topLeft, bottomLeft, bottomRight, topRight: Point) -> [Corne
     }
 }
 
-getFacePoints :: proc(cube: CubeFacesPoints, primers: Primers, direction: Direction) -> [Corner]Point {
+getFacePoints :: proc(cube: CubeFacesPoints, chunk: world.Chunk, direction: Direction) -> [Corner]Point {
     pointByVertex := [Position]Point{}
 
     if .SouthwestDown in cube.points {
-        pointByVertex[.SouthwestDown] = Point{toVec3(cube.pos) + {0, 0, 0}, getAO(cube.pos, {0, 0, 0}, direction, primers), getLight(cube.pos, {0, 0, 0}, direction, primers)}
+        pointByVertex[.SouthwestDown] = Point{toVec3(cube.pos) + {0, 0, 0}, getAO(cube.pos, {0, 0, 0}, direction, chunk), getLight(cube.pos, {0, 0, 0}, direction, chunk)}
     }
     if .NorthwestDown in cube.points {
-        pointByVertex[.NorthwestDown] = Point{toVec3(cube.pos) + {0, 0, 1}, getAO(cube.pos, {0, 0, 1}, direction, primers), getLight(cube.pos, {0, 0, 1}, direction, primers)}
+        pointByVertex[.NorthwestDown] = Point{toVec3(cube.pos) + {0, 0, 1}, getAO(cube.pos, {0, 0, 1}, direction, chunk), getLight(cube.pos, {0, 0, 1}, direction, chunk)}
     }
     if .SouthwestUp   in cube.points {
-        pointByVertex[.SouthwestUp]   = Point{toVec3(cube.pos) + {0, 1, 0}, getAO(cube.pos, {0, 1, 0}, direction, primers), getLight(cube.pos, {0, 1, 0}, direction, primers)}
+        pointByVertex[.SouthwestUp]   = Point{toVec3(cube.pos) + {0, 1, 0}, getAO(cube.pos, {0, 1, 0}, direction, chunk), getLight(cube.pos, {0, 1, 0}, direction, chunk)}
     }
     if .NorthwestUp   in cube.points {
-        pointByVertex[.NorthwestUp]   = Point{toVec3(cube.pos) + {0, 1, 1}, getAO(cube.pos, {0, 1, 1}, direction, primers), getLight(cube.pos, {0, 1, 1}, direction, primers)}
+        pointByVertex[.NorthwestUp]   = Point{toVec3(cube.pos) + {0, 1, 1}, getAO(cube.pos, {0, 1, 1}, direction, chunk), getLight(cube.pos, {0, 1, 1}, direction, chunk)}
     }
     if .SoutheastDown in cube.points {
-        pointByVertex[.SoutheastDown] = Point{toVec3(cube.pos) + {1, 0, 0}, getAO(cube.pos, {1, 0, 0}, direction, primers), getLight(cube.pos, {1, 0, 0}, direction, primers)}
+        pointByVertex[.SoutheastDown] = Point{toVec3(cube.pos) + {1, 0, 0}, getAO(cube.pos, {1, 0, 0}, direction, chunk), getLight(cube.pos, {1, 0, 0}, direction, chunk)}
     }
     if .NortheastDown in cube.points {
-        pointByVertex[.NortheastDown] = Point{toVec3(cube.pos) + {1, 0, 1}, getAO(cube.pos, {1, 0, 1}, direction, primers), getLight(cube.pos, {1, 0, 1}, direction, primers)}
+        pointByVertex[.NortheastDown] = Point{toVec3(cube.pos) + {1, 0, 1}, getAO(cube.pos, {1, 0, 1}, direction, chunk), getLight(cube.pos, {1, 0, 1}, direction, chunk)}
     }
     if .SoutheastUp   in cube.points {
-        pointByVertex[.SoutheastUp]   = Point{toVec3(cube.pos) + {1, 1, 0}, getAO(cube.pos, {1, 1, 0}, direction, primers), getLight(cube.pos, {1, 1, 0}, direction, primers)}
+        pointByVertex[.SoutheastUp]   = Point{toVec3(cube.pos) + {1, 1, 0}, getAO(cube.pos, {1, 1, 0}, direction, chunk), getLight(cube.pos, {1, 1, 0}, direction, chunk)}
     }
     if .NortheastUp   in cube.points {
-        pointByVertex[.NortheastUp]   = Point{toVec3(cube.pos) + {1, 1, 1}, getAO(cube.pos, {1, 1, 1}, direction, primers), getLight(cube.pos, {1, 1, 1}, direction, primers)}
+        pointByVertex[.NortheastUp]   = Point{toVec3(cube.pos) + {1, 1, 1}, getAO(cube.pos, {1, 1, 1}, direction, chunk), getLight(cube.pos, {1, 1, 1}, direction, chunk)}
     }
 
     switch direction {
@@ -407,16 +368,16 @@ getTextureID :: proc(dir: Direction, id: u32) -> f32 {
     return 0
 }
 
-makePoinsAndFaces :: proc(cubesPoints: [dynamic]CubeFacesPoints, primers: Primers) -> [dynamic]Face {
+makePoinsAndFaces :: proc(cubesPoints: [dynamic]CubeFacesPoints, chunk: world.Chunk) -> [dynamic]Face {
     faces := [dynamic]Face{}
 
     for cube in cubesPoints {
-        if .Up     in cube.faces {append(&faces, Face{cube.pos, .Up,     getTextureID(.Up,     cube.id), .Up, getFacePoints(cube, primers, .Up    )})}
-        if .Bottom in cube.faces {append(&faces, Face{cube.pos, .Bottom, getTextureID(.Bottom, cube.id), .Up, getFacePoints(cube, primers, .Bottom)})}
-        if .North  in cube.faces {append(&faces, Face{cube.pos, .North,  getTextureID(.North,  cube.id), .Up, getFacePoints(cube, primers, .North )})}
-        if .South  in cube.faces {append(&faces, Face{cube.pos, .South,  getTextureID(.South,  cube.id), .Up, getFacePoints(cube, primers, .South )})}
-        if .East   in cube.faces {append(&faces, Face{cube.pos, .East,   getTextureID(.East,   cube.id), .Up, getFacePoints(cube, primers, .East  )})}
-        if .West   in cube.faces {append(&faces, Face{cube.pos, .West,   getTextureID(.West,   cube.id), .Up, getFacePoints(cube, primers, .West  )})}
+        if .Up     in cube.faces {append(&faces, Face{cube.pos, .Up,     getTextureID(.Up,     cube.id), .Up, getFacePoints(cube, chunk, .Up    )})}
+        if .Bottom in cube.faces {append(&faces, Face{cube.pos, .Bottom, getTextureID(.Bottom, cube.id), .Up, getFacePoints(cube, chunk, .Bottom)})}
+        if .North  in cube.faces {append(&faces, Face{cube.pos, .North,  getTextureID(.North,  cube.id), .Up, getFacePoints(cube, chunk, .North )})}
+        if .South  in cube.faces {append(&faces, Face{cube.pos, .South,  getTextureID(.South,  cube.id), .Up, getFacePoints(cube, chunk, .South )})}
+        if .East   in cube.faces {append(&faces, Face{cube.pos, .East,   getTextureID(.East,   cube.id), .Up, getFacePoints(cube, chunk, .East  )})}
+        if .West   in cube.faces {append(&faces, Face{cube.pos, .West,   getTextureID(.West,   cube.id), .Up, getFacePoints(cube, chunk, .West  )})}
     }
 
     return faces
@@ -426,7 +387,7 @@ toFlipe :: proc(a00, a01, a10, a11: f32) -> bool {
 	return a00 + a11 < a01 + a10;
 }
 
-makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> (Mesh, Mesh) {
+makeVertices :: proc(faces: [dynamic]Face) -> (Mesh, Mesh) {
     blockVertices := [dynamic]f32{}
     waterVertices := [dynamic]f32{}
     blockIndices := [dynamic]u32{}
@@ -507,45 +468,15 @@ makeVertices :: proc(faces: [dynamic]Face, primers: Primers) -> (Mesh, Mesh) {
     return {blockVertices, blockIndices, i32(len(blockIndices))}, {waterVertices, waterIndices, i32(len(waterIndices))}
 }
 
-generateMesh :: proc(chunk: ^world.Chunk) -> ChunkData {
-    x := chunk.pos.x
-    y := chunk.pos.y
-    z := chunk.pos.z
-    
-    primers: Primers
-
-    for i in -1..=1 {
-        for j in -1..=1 {
-            for k in -1..=1 {
-                c := chunk
-                if i < 0 {
-                    c = c.sides[.West]
-                } else if i > 0 {
-                    c = c.sides[.East]
-                }
-                if j < 0 {
-                    c = c.sides[.Bottom]
-                } else if j > 0 {
-                    c = c.sides[.Up]
-                }
-                if k < 0 {
-                    c = c.sides[.South]
-                } else if k > 0 {
-                    c = c.sides[.North]
-                }
-                primers[i + 1][j + 1][k + 1] = c
-            }
-        }
-    }
-
-    cubes := filterCubes(&primers)
-    cubesFaces := makeCubes(&primers, cubes)
+generateMesh :: proc(chunk: world.Chunk) -> ChunkData {
+    cubes := filterCubes(chunk)
+    cubesFaces := makeCubes(chunk, cubes)
     delete(cubes)
     cubesPoints := makeCubePoints(cubesFaces)
     delete(cubesFaces)
-    faces := makePoinsAndFaces(cubesPoints, primers)
+    faces := makePoinsAndFaces(cubesPoints, chunk)
     delete(cubesPoints)
-    blocks, water := makeVertices(faces, primers)
+    blocks, water := makeVertices(faces)
     delete(faces)
 
     return {chunk.pos, blocks, water}

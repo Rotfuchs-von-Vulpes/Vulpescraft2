@@ -53,7 +53,16 @@ setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
     return ChunkBuffer{data.pos, {}, data, blocksBuffer, waterBuffer}
 }
 
-eval :: proc(data: mesh.ChunkData) -> ChunkBuffer {
+eval :: proc(chunk: world.Chunk) -> mesh.ChunkData {
+    pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
+    chunkBuffer, ok, _ := util.map_force_get(&dataChunks, pos)
+    if ok {
+        chunkBuffer^ = mesh.generateMesh(chunk)
+    }
+    return chunkBuffer^
+}
+
+setup :: proc(data: mesh.ChunkData) -> ChunkBuffer {
     pos := iVec3{data.pos.x, data.pos.y, data.pos.z}
     chunkBuffer, ok, _ := util.map_force_get(&chunkMap, pos)
     if ok {
@@ -64,26 +73,6 @@ eval :: proc(data: mesh.ChunkData) -> ChunkBuffer {
 
 testMesh :: proc(pos: iVec3) -> bool {
 	return pos in chunkMap
-}
-
-generateManyMeshes :: proc(chunks: [dynamic]^world.Chunk) -> [dynamic]mesh.ChunkData {
-    chunksData: [dynamic]mesh.ChunkData
-
-    for &chunk in chunks {
-        append(&chunksData, mesh.generateMesh(chunk))
-    }
-
-    return chunksData
-}
-
-setupManyChunks :: proc(chunks: ^[dynamic]mesh.ChunkData) -> [dynamic]ChunkBuffer {
-    chunksBuffers: [dynamic]ChunkBuffer
-
-    for &chunk in chunks {
-        append(&chunksBuffers, eval(chunk))
-    }
-
-    return chunksBuffers
 }
 
 testAabb :: proc(MPV: mat4, min, max: vec3) -> bool
