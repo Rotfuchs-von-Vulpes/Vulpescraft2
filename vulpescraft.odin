@@ -106,13 +106,21 @@ reloadChunks :: proc() {
 	#reverse for idx in buffer {
 		unordered_remove(&allChunks, idx)
 	}
-	// clear_dynamic_array(&allChunks)
-	// allChunks = buffer
 
 	chan.send(threadWorkChan, ThreadWork {
 		chunkPosition = playerCamera.chunk,
 	})
 }
+
+yaw: f32 = -90.0;
+pitch: f32 = 0.0;
+
+lastChunkX := playerCamera.chunk.x
+lastChunkY := playerCamera.chunk.y
+lastChunkZ := playerCamera.chunk.z
+
+last: time.Tick
+cameraSpeed: f32 = 0.0125
 
 main :: proc() {
 	context = runtime.default_context()
@@ -177,12 +185,6 @@ main :: proc() {
 	worldRender.setupBlockDrawing(&blockRender)
 	worldRender.setupWaterDrawing(&waterRender)
 
-	//world.start()
-
-	// tmp := world.peak(playerCamera.chunk.x, playerCamera.chunk.y, playerCamera.chunk.z, playerCamera.viewDistance)
-	// defer delete(tmp)
-	// allChunks = worldRender.setupManyChunks(tmp)
-
 	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
 
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
@@ -205,14 +207,6 @@ main :: proc() {
 	toRight := false
 	toLeft := false
 	toDebug := false
-
-	// if (gl.DebugMessageCallback != nil) {
-	// 	gl.Enable(gl.DEBUG_OUTPUT);
-	// 	gl.Enable(gl.DEBUG_OUTPUT_SYNCHRONOUS);
-	// 	gl.DebugMessageCallback(DebugCallback, nil);
-	
-	// 	skeewb.console_log(.INFO, "OpenGL: Enabled Debug Message Callback");
-	// }
 	
 	chunkGenereatorThread := thread.create(generateChunkBlocks)
 	thread.start(chunkGenereatorThread)
@@ -485,8 +479,6 @@ main :: proc() {
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
-	// delete(allChunksCopy)
-	// delete(dataChunksCopy)
 	delete(allChunks)
 	delete(chunks)
 	
@@ -504,24 +496,3 @@ main :: proc() {
 		skeewb.console_log(.INFO, fmt.tprintf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory))
 	}
 }
-
-yaw: f32 = -90.0;
-pitch: f32 = 0.0;
-
-lastChunkX := playerCamera.chunk.x
-lastChunkY := playerCamera.chunk.y
-lastChunkZ := playerCamera.chunk.z
-
-last: time.Tick
-cameraSpeed: f32 = 0.0125
-
-// @(instrumentation_enter)
-// tracy_enter :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
-//     context = runtime.default_context()
-// 	tracy.Zone(loc = loc)
-// }
-
-// @(instrumentation_exit)
-// tracy_exit :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
-// 	//
-// }

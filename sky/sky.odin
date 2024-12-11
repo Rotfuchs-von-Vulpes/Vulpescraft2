@@ -99,34 +99,6 @@ vertShader2 :: #load("../assets/shaders/sun_vert.glsl", string)
 fragShader2 :: #load("../assets/shaders/sun_frag.glsl", string)
 
 setupSun :: proc(camera: ^util.Camera, render: ^Render) {
-	// gl.GenTextures(1, &render.texture)
-	// gl.BindTexture(gl.TEXTURE_2D_ARRAY, render.texture)
-	// gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT)
-	// gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT)
-	// gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-	// gl.TexParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-
-	// width, height, channels: i32
-	// datas := []string{
-	// 	core.resource_string(core.resource_load("madera", "basalt/assets/textures/default_box.png")),
-	// 	core.resource_string(core.resource_load("preda", "basalt/assets/textures/default_stone.png")),
-	// 	core.resource_string(core.resource_load("terra", "basalt/assets/textures/default_dirt.png")),
-	// 	core.resource_string(core.resource_load("teratu", "basalt/assets/textures/default_dirt_with_grass.png")),
-	// 	core.resource_string(core.resource_load("matu", "basalt/assets/textures/default_grass.png")),
-	// }
-	// gl.TexImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.SRGB8_ALPHA8, 16, 16, i32(len(datas)), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
-	// for tex, idx in datas {
-	// 	pixels := stb.load_from_memory(raw_data(tex), i32(len(tex)), &width, &height, &channels, 4)
-	// 	gl.TexSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i32(idx), 16, 16, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-	// 	stb.image_free(pixels)
-	// }
-	// gl.GenerateMipmap(gl.TEXTURE_2D_ARRAY)
-	// if sdl2.GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic") {
-	// 	filter: f32
-	// 	gl.GetFloatv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &filter)
-	// 	gl.TexParameterf(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAX_ANISOTROPY, filter)
-	// }
-    
 	gl.GenVertexArrays(1, &render.vao)
 	gl.BindVertexArray(render.vao)
 
@@ -147,7 +119,6 @@ setupSun :: proc(camera: ^util.Camera, render: ^Render) {
         skeewb.console_log(.ERROR, "could not compile sky shaders\n %s\n %s", a, c)
     }
 	
-	//gl.UseProgram(render.program)
 	render.uniforms = gl.get_uniforms_from_program(render.program)
 }
 

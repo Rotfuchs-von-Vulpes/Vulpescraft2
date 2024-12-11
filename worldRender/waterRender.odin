@@ -64,14 +64,11 @@ drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Re
 		pos := vec3{f32(chunk.pos.x) * 16 - camera.pos.x, f32(chunk.pos.y) * 16 - camera.pos.y, f32(chunk.pos.z) * 16 - camera.pos.z}
 		model := math.matrix4_translate_f32(pos)
 		modelView := camera.view * model
-		// inverseModelView := glm.inverse_mat4(modelView)
+		
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
-		// gl.UniformMatrix4fv(render.uniforms["modelView"].location, 1, false, &modelView[0, 0])
-		// gl.UniformMatrix4fv(render.uniforms["inverseModelView"].location, 1, false, &inverseModelView[0, 0])
 		
 		gl.BindVertexArray(chunk.waterBuffer.VAO)
 		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, chunk.waterBuffer.EBO);
 		gl.DrawElements(gl.TRIANGLES, chunk.data.water.length, gl.UNSIGNED_INT, nil)
-		// skeewb.console_log(.INFO, "%d", chunk.waterBuffer.EBO)
 	}
 }
