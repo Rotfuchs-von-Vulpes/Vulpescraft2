@@ -172,13 +172,13 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
             }
         }
         for i in -1..=1 {
-            for j in -1..=1 {
-                for k in -1..=1 {
+            for k in -1..=1 {
+                for j := i32(1); j > -1; j -= 1 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
                     if c.isEmpty {
                         allLight(c)
                     } else {
-                        sunlight(c)
+                        sunlight(c, eval(pos.x + i32(i), pos.y + i32(j + 1), pos.z + i32(k), tempMap))
                     }
                 }
             }

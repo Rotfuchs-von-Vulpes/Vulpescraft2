@@ -17,7 +17,7 @@ allLight :: proc(chunk: ^Chunk) {
     }
 }
 
-sunlight :: proc(chunk: ^Chunk) {
+sunlight :: proc(chunk, topChunk: ^Chunk) {
     if chunk.level != .Trees do return
     cache: [16][16][16]u8
     solidCache: [16][16][16]bool
@@ -25,8 +25,6 @@ sunlight :: proc(chunk: ^Chunk) {
     defer delete(sunlightCache)
     emissiveCache := [dynamic]Light{}
     defer delete(emissiveCache)
-
-    //topChunk := chunk.sides[.Up]
 
     for x in 0..<16 {
         for z in 0..<16 {
@@ -48,19 +46,18 @@ sunlight :: proc(chunk: ^Chunk) {
                     append(&emissiveCache, Light{iVec3{i32(x), i32(y), i32(z)}, 15})
                 }
 
-                // top := u8(15)
-                // if y == 15 {
-                //     // if topChunk != nil {
-                //     //     top = topChunk.primer[x][0][z].light.y
-                //     // }
-                //     top = 15
-                // } else {
-                //     top = cache[x][y + 1][z]
-                // }
+                top := u8(15)
+                if y == 15 {
+                    if topChunk != nil {
+                        top = topChunk.primer[x + 1][1][z + 1].light.y
+                    }
+                } else {
+                    top = cache[x][y + 1][z]
+                }
 
                 if !foundGround {
-                    // cache[x][y][z] = top
-                    append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, 15})
+                    cache[x][y][z] = top
+                    append(&sunlightCache, Light{iVec3{i32(x), i32(y), i32(z)}, top})
                 }
             }
         }
