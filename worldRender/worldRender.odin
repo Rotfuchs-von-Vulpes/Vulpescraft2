@@ -31,6 +31,7 @@ ChunkBuffer :: struct{
 	data: mesh.ChunkData,
 	blockBuffer: Buffers,
 	waterBuffer: Buffers,
+	toDelete: bool,
 }
 
 Render :: struct{
@@ -50,14 +51,15 @@ setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
 	delete(data.water.indices)
 	delete(data.water.vertices)
 
-    return ChunkBuffer{data.pos, {}, data, blocksBuffer, waterBuffer}
+    return ChunkBuffer{data.pos, {}, data, blocksBuffer, waterBuffer, false}
 }
 
 eval :: proc(chunk: ^world.Chunk) -> mesh.ChunkData {
     pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
     chunkBuffer, ok, _ := util.map_force_get(&dataChunks, pos)
-    if ok {
+    if ok || chunk.remeshing {
         chunkBuffer^ = mesh.generateMesh(chunk)
+		// chunk.remeshing = false
     }
     return chunkBuffer^
 }
@@ -135,5 +137,10 @@ nuke :: proc() {
 destroy :: proc(chunks: [dynamic]^world.Chunk) {
 	for chunk in chunks {
 		delete_key(&chunkMap, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
+		delete_key(&dataChunks, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
+
+		// #reverse for &c, idx in bufferedChunks {
+		// 	if c.pos == chunk.pos do c.toDelete = true
+		// }
 	}
 }

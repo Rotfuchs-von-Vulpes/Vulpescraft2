@@ -38,6 +38,7 @@ playerCamera := util.Camera{
 
 chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
+toRemashing: [dynamic][3]i32
 
 cameraSetup :: proc() {
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
@@ -49,29 +50,50 @@ cameraMove :: proc() {
 
 ThreadWork :: struct {
 	chunkPosition: [3]i32,
+	reset: bool,
 }
 
-threadWorkChan: chan.Chan(ThreadWork)
+threadWork_chan: chan.Chan(ThreadWork)
 chunks_chan: chan.Chan(^world.Chunk)
+highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
+generateChunk :: proc(center, pos: [3]i32) {
+	chunk := world.genPoll(center, pos, &world.allChunks)
+	if chunk != nil && !world.history[chunk.pos] {
+		if !chunk.isEmpty do chan.send(chunks_chan, chunk)
+		world.history[chunk.pos] = true
+	} 
+}
+
 generateChunkBlocks :: proc(^thread.Thread) {
-	for !chan.is_closed(threadWorkChan) {
-		work, ok := chan.recv(threadWorkChan)
-		if !ok {
-			continue
+	work: ThreadWork
+	for !chan.is_closed(threadWork_chan) {
+		if chan.can_recv(highPriority_chan) {
+			for {
+				pos, ok := chan.try_recv(highPriority_chan)
+				if !ok do break
+				world.history[pos] = false
+				generateChunk(work.chunkPosition, pos)
+			}
 		}
+
+		work, _ = chan.recv(threadWork_chan)
 
 		append(&world.genStack, work.chunkPosition)
 		for pos in world.genStack {
-			work2, ok2 := chan.try_recv(threadWorkChan)
-			if ok2 do work = work2
-			chunk, ok := world.genPoll(work.chunkPosition, pos, &world.allChunks)
-			if !ok do break
-			if chunk != nil && !world.history[chunk.pos] {
-				if !chunk.isEmpty do chan.send(chunks_chan, chunk)
-				world.history[chunk.pos] = true
-			} 
+			work2, newCenter := chan.try_recv(threadWork_chan)
+			hasHighPriority := chan.can_recv(highPriority_chan)
+			if newCenter do work = work2
+			if hasHighPriority {
+				for {
+					pos, ok := chan.try_recv(highPriority_chan)
+					if !ok do break
+					world.history[pos] = false
+					generateChunk(work.chunkPosition, pos)
+				}
+			}
+			generateChunk(work.chunkPosition, pos)
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
@@ -92,7 +114,7 @@ generateChunkMesh :: proc(^thread.Thread) {
 
 toReload := false
 
-reloadChunks :: proc() {
+reloadChunks :: proc(reset: bool) {
 	toReload = false
 
 	clear_map(&world.history)
@@ -107,7 +129,7 @@ reloadChunks :: proc() {
 		unordered_remove(&allChunks, idx)
 	}
 
-	chan.send(threadWorkChan, ThreadWork {
+	chan.send(threadWork_chan, ThreadWork {
 		chunkPosition = playerCamera.chunk,
 	})
 }
@@ -134,7 +156,8 @@ main :: proc() {
 	err: runtime.Allocator_Error
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
-	threadWorkChan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
+	threadWork_chan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
+	highPriority_chan, err = chan.create_buffered(chan.Chan([3]i32), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -212,7 +235,7 @@ main :: proc() {
 	thread.start(chunkGenereatorThread)
 	meshGenereatorThread := thread.create(generateChunkMesh)
 	thread.start(meshGenereatorThread)
-	reloadChunks()
+	reloadChunks(false)
 
 	looking := true
 
@@ -304,23 +327,31 @@ main :: proc() {
 					playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 					frameBuffer.resize(&playerCamera, fboRender)
 				}
-			} /*else if event.type == .MOUSEBUTTONDOWN {
+			} else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
 					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						reloadChunks()
+						for chunk in chunksToDelete {
+							chan.send(highPriority_chan, chunk.pos)
+							append(&toRemashing, chunk.pos)
+						}
+						reloadChunks(true)
 					}
 				} else if event.button.button == 3 {
 					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
-						reloadChunks()
+						for chunk in chunksToDelete {
+							chan.send(highPriority_chan, chunk.pos)
+							append(&toRemashing, chunk.pos)
+						}
+						reloadChunks(true)
 					}
 				}
-			}*/
+			}
 		}
 
 		scale: [3]f32 = {0, 0, 0}
@@ -370,9 +401,9 @@ main :: proc() {
 			moved = true
 		}
 
-		if moved {reloadChunks()}
+		if moved {reloadChunks(false)}
 
-		if toReload {reloadChunks()}
+		if toReload {reloadChunks(false)}
 		
 		{
 			//tmp := [dynamic]mesh.ChunkData{}
@@ -384,15 +415,15 @@ main :: proc() {
 					break
 				}
 				done = true
+				for chunk2, idx in allChunks {
+					if chunk.pos == chunk2.pos {
+						unordered_remove(&allChunks, idx)
+					}
+				}
 				append(&allChunks, worldRender.setup(chunk))
 			}
 
 			if done {
-				// if allChunks != nil {
-				// 	delete(allChunks)
-				// }
-				// if chunks != nil {delete(chunks)}
-				// allChunks = worldRender.setupManyChunks(&tmp)
 				worldRender.frustumMove(&allChunks, &playerCamera)
 				delete(chunks)
 				chunks = worldRender.frustumCulling(&allChunks, &playerCamera)
@@ -433,7 +464,7 @@ main :: proc() {
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 	}
 	
-	chan.close(threadWorkChan)
+	chan.close(threadWork_chan)
 	chan.close(chunks_chan)
 	chan.close(meshes_chan)
 	thread.destroy(chunkGenereatorThread)
@@ -479,6 +510,7 @@ main :: proc() {
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)
 	gl.DeleteFramebuffers(1, &fboRender.id)
+	delete(toRemashing)
 	delete(allChunks)
 	delete(chunks)
 	

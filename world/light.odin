@@ -32,6 +32,7 @@ sunlight :: proc(chunk: ^Chunk) {
         for z in 0..<16 {
             foundGround := false
             for y := 15; y >= 0; y -= 1 {
+                chunk.primer[x + 1][y + 1][z + 1].light = {0, 0}
                 block := chunk.primer[x + 1][y + 1][z + 1]
                 id := block.id
                 transparent := id == 7 || id == 8 || id == 9

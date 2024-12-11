@@ -1,27 +1,29 @@
 package world
 
+import math "core:math/linalg"
+
 getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
-        (pos.x + 16) / 16 - 1,
-        (pos.y + 16) / 16 - 1,
-        (pos.z + 16) / 16 - 1
+        i32(math.floor(f32(pos.x) / 16)),
+        i32(math.floor(f32(pos.y) / 16)),
+        i32(math.floor(f32(pos.z) / 16)),
     }
 
     chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
 
     iPos: iVec3
-    iPos.x = pos.x %% 16
-    iPos.y = pos.y %% 16
-    iPos.z = pos.z %% 16
+    iPos.x = i32(math.floor(16 * math.fract(f32(pos.x) / 16)))
+    iPos.y = i32(math.floor(16 * math.fract(f32(pos.y) / 16)))
+    iPos.z = i32(math.floor(16 * math.fract(f32(pos.z) / 16)))
 
     return chunk, iPos
 }
 
 toiVec3 :: proc(vec: vec3) -> iVec3 {
     return iVec3{
-        i32(vec.x),
-        i32(vec.y),
-        i32(vec.z),
+        i32(math.floor(vec.x)),
+        i32(math.floor(vec.y)),
+        i32(math.floor(vec.z)),
     }
 }
 
@@ -86,60 +88,19 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
 atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
     chunks: [dynamic]^Chunk
 
-    offsetX: i32 = 0
-    offsetY: i32 = 0
-    offsetZ: i32 = 0
-
-    if pos.x >= 8 {
-        offsetX += 1
-    } else {
-        offsetX -= 1
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &allChunks)
+                c.level = .Trees
+                append(&chunks, c)
+            }
+        }
     }
 
-    if pos.y >= 8 {
-        offsetY += 1
-    } else {
-        offsetY -= 1
+    for &chunk in chunks {
+        chunk.remeshing = true
     }
-
-    if pos.z >= 8 {
-        offsetZ += 1
-    } else {
-        offsetZ -= 1
-    }
-
-    chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z, &allChunks)
-    chunk.level = .Trees
-    append(&chunks, chunk)
-
-    if pos.x == 0 {
-        chunk := eval(chunk.pos.x - 1, chunk.pos.y, chunk.pos.z, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    } else if pos.x == 15 {
-        chunk := eval(chunk.pos.x + 1, chunk.pos.y, chunk.pos.z, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    }
-    if pos.y == 0 {
-        chunk := eval(chunk.pos.x, chunk.pos.y - 1, chunk.pos.z, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    } else if pos.y == 15 {
-        chunk := eval(chunk.pos.x, chunk.pos.y + 1, chunk.pos.z, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    }
-    if pos.z == 0 {
-        chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z - 1, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    } else if pos.z == 15 {
-        chunk := eval(chunk.pos.x, chunk.pos.y, chunk.pos.z + 1, &allChunks)
-        chunk.level = .Trees
-        append(&chunks, chunk)
-    }
-
 
     return chunks
 }

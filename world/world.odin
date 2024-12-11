@@ -30,6 +30,7 @@ Chunk :: struct {
     opened: FaceSet,
     level: GeneratePhase,
     isEmpty: bool,
+    remeshing: bool,
 }
 
 allChunks := make(map[iVec3]^Chunk)
@@ -44,6 +45,7 @@ getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
     chunk.opened = {}
     chunk.pos = {x, y, z}
     chunk.isEmpty = true
+    chunk.remeshing = false
 }
 
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
@@ -157,8 +159,8 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     }
 }
 
-genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool) {
-    if history[pos] do return nil, true
+genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
+    if history[pos] do return nil
     chunk := eval(pos.x, pos.y, pos.z, tempMap)
     if chunk.level != .ExternalLight {
         for i in -2..=2 {
@@ -205,7 +207,7 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> (^Chunk, bool
         append(&genStack, iVec3{pos.x, pos.y, pos.z + 1})
     }
 
-    return chunk, true
+    return chunk
 }
 
 nuke :: proc() {
