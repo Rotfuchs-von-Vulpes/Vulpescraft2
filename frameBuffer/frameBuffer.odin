@@ -65,7 +65,6 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 
 	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
 		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
-		//core.quit(-1)
 	}
 
 	gl.GenVertexArrays(1, &render.vao)
@@ -89,7 +88,6 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
     }
 	
 	render.uniforms = gl.get_uniforms_from_program(render.program)
-	//gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
 }
 
 resize :: proc(camera: ^util.Camera, render: Render) {
@@ -106,9 +104,6 @@ draw :: proc(render: Render) {
 	gl.BindVertexArray(render.vao)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
-	// gl.ActiveTexture(gl.TEXTURE1)
-	// gl.BindTexture(gl.TEXTURE_2D, render.depth)
-
-	//gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
+	
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }
