@@ -20,6 +20,7 @@ import "frameBuffer"
 import "util"
 import "sky"
 import "worldRender/debug"
+import "hud"
 
 import "tracy"
 
@@ -214,6 +215,7 @@ main :: proc() {
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 
 	frameBuffer.setup(&playerCamera, &fboRender)
+	hud.setup()
 
 	sky.setup(&playerCamera, &skyRender)
 	sky.setupSun(&playerCamera, &sunRender)
@@ -238,6 +240,8 @@ main :: proc() {
 	reloadChunks(false)
 
 	looking := true
+
+	index := 2
 
 	loop: for {
 		duration := time.tick_since(start_tick)
@@ -351,6 +355,14 @@ main :: proc() {
 						reloadChunks(true)
 					}
 				}
+			} else if event.type == .MOUSEWHEEL {
+				if event.wheel.y > 0 {
+					index += 1
+					if index > 8 do index = 0
+				} else {
+					index -= 1
+					if index < 0 do index = 8
+				}
 			}
 		}
 
@@ -452,6 +464,7 @@ main :: proc() {
 		gl.UseProgram(fboRender.program)
 		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 		frameBuffer.draw(fboRender)
+		hud.draw(screenWidth, screenHeight, index)
 
 		sdl2.GL_SwapWindow(window)
 		
@@ -476,6 +489,7 @@ main :: proc() {
 	defer context.allocator = prev_allocator
 	defer mem.tracking_allocator_destroy(tracking_allocator)
 	
+	hud.nuke()
 	worldRender.nuke()
 	world.nuke()
 
