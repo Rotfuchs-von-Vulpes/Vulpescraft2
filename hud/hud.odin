@@ -13,9 +13,10 @@ Render :: struct{
 	program: u32,
 	hotbarTexture: u32,
 	slotTexture: u32,
+	cross: u32,
 }
 
-render: Render = {0, 0, {}, 0, 0, 0}
+render: Render = {0, 0, {}, 0, 0, 0, 0}
 
 quadVertices := [?]f32{
 	// positions   // texCoords
@@ -33,6 +34,7 @@ fragShader :: #load("../assets/shaders/gui_frag.glsl", string)
 
 slot :: #load("../assets/textures/slot.png", string)
 hotbar :: #load("../assets/textures/hotbar.png", string)
+cross :: #load("../assets/textures/cross.png", string)
 
 setup :: proc() {
 	gl.GenVertexArrays(1, &render.vao)
@@ -64,6 +66,14 @@ setup :: proc() {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 
+	pixels = stb.load_from_memory(raw_data(cross), i32(len(cross)), &width, &height, &channels, 4)
+	gl.GenTextures(1, &render.cross)
+	gl.BindTexture(gl.TEXTURE_2D, render.cross)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
 	shaderSuccess: bool
@@ -83,6 +93,10 @@ draw :: proc(width, height: i32, index: int, frameTexture: u32) {
 	gl.UseProgram(render.program)
 	gl.BindVertexArray(render.vao)
 	gl.Uniform1i(render.uniforms["isCross"].location, 0)
+	gl.Uniform1i(render.uniforms["guiTexture"].location, 0)
+	gl.Uniform1i(render.uniforms["fboTexture"].location, 1)
+	gl.ActiveTexture(gl.TEXTURE1)
+	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
 
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.Uniform1f(render.uniforms["width"].location, 364 / f32(width))
@@ -102,12 +116,9 @@ draw :: proc(width, height: i32, index: int, frameTexture: u32) {
 	gl.Uniform1i(render.uniforms["isCross"].location, 1)
 	gl.Uniform1f(render.uniforms["xOffset"].location, 0)
 	gl.Uniform1f(render.uniforms["yOffset"].location, 0)
-	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
-	gl.Uniform1f(render.uniforms["width"].location, 2 / f32(width))
-	gl.Uniform1f(render.uniforms["height"].location, 18 / f32(height))
-	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 	gl.Uniform1f(render.uniforms["width"].location, 18 / f32(width))
-	gl.Uniform1f(render.uniforms["height"].location, 2 / f32(height))
+	gl.Uniform1f(render.uniforms["height"].location, 18 / f32(height))
+	gl.BindTexture(gl.TEXTURE_2D, render.cross)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }
 
