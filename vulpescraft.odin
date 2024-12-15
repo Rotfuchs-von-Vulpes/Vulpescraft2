@@ -464,7 +464,7 @@ main :: proc() {
 		gl.UseProgram(fboRender.program)
 		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 		frameBuffer.draw(fboRender)
-		hud.draw(screenWidth, screenHeight, index)
+		hud.draw(screenWidth, screenHeight, index, fboRender.texture)
 
 		sdl2.GL_SwapWindow(window)
 		

@@ -57,7 +57,6 @@ setup :: proc() {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 
 	pixels = stb.load_from_memory(raw_data(slot), i32(len(slot)), &width, &height, &channels, 4)
-	// gl.ActiveTexture(gl.TEXTURE1)
 	gl.GenTextures(1, &render.slotTexture)
 	gl.BindTexture(gl.TEXTURE_2D, render.slotTexture)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
@@ -80,11 +79,12 @@ setup :: proc() {
 	render.uniforms = gl.get_uniforms_from_program(render.program)
 }
 
-draw :: proc(width, height: i32, index: int) {
+draw :: proc(width, height: i32, index: int, frameTexture: u32) {
 	gl.UseProgram(render.program)
 	gl.BindVertexArray(render.vao)
-	gl.ActiveTexture(gl.TEXTURE0)
+	gl.Uniform1i(render.uniforms["isCross"].location, 0)
 
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.Uniform1f(render.uniforms["width"].location, 364 / f32(width))
 	gl.Uniform1f(render.uniforms["height"].location, 44 / f32(height))
 	gl.Uniform1f(render.uniforms["xOffset"].location, 0)
@@ -97,6 +97,17 @@ draw :: proc(width, height: i32, index: int) {
 	gl.Uniform1f(render.uniforms["xOffset"].location, (f32(index) - 4) * 80 / f32(width))
 	gl.Uniform1f(render.uniforms["yOffset"].location, f32(height - 44) / f32(height))
 	gl.BindTexture(gl.TEXTURE_2D, render.slotTexture)
+	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+
+	gl.Uniform1i(render.uniforms["isCross"].location, 1)
+	gl.Uniform1f(render.uniforms["xOffset"].location, 0)
+	gl.Uniform1f(render.uniforms["yOffset"].location, 0)
+	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
+	gl.Uniform1f(render.uniforms["width"].location, 2 / f32(width))
+	gl.Uniform1f(render.uniforms["height"].location, 18 / f32(height))
+	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+	gl.Uniform1f(render.uniforms["width"].location, 18 / f32(width))
+	gl.Uniform1f(render.uniforms["height"].location, 2 / f32(height))
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }
 
