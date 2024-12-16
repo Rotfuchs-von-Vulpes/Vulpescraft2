@@ -344,7 +344,7 @@ main :: proc() {
 						reloadChunks(true)
 					}
 				} else if event.button.button == 3 {
-					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front)
+					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front, u16(8 - index) + 1)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)

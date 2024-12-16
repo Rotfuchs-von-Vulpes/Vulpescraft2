@@ -132,12 +132,12 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
     return chunks, pos, true
 }
 
-place :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
+place :: proc(origin, direction: vec3, block: u16) -> ([dynamic]^Chunk, iVec3, bool) {
     chunks: [dynamic]^Chunk
     chunk, pos, ok := raycast(origin, direction, true)
 
     if !ok {return chunks, pos, false}
-    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 5
+    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
     if pos.x == 0 {
         chunk.opened += {.West}
     } else if pos.x == 15 {
