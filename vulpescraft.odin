@@ -200,7 +200,7 @@ main :: proc() {
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}
@@ -458,7 +458,11 @@ main :: proc() {
 			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		}
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
-		worldRender.drawWater(chunks, &playerCamera, waterRender)
+		gl.DrawBuffer(gl.COLOR_ATTACHMENT1)
+		frameBuffer.draw(fboRender)
+		gl.Enable(gl.DEPTH_TEST)
+		gl.DrawBuffer(gl.COLOR_ATTACHMENT0)
+		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.auxiliarTexture)
 		
 		gl.Viewport(0, 0, screenWidth, screenHeight)
 		gl.UseProgram(fboRender.program)

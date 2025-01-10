@@ -1,13 +1,17 @@
 #version 330 core
 
 out vec4 fragColor;
+
 in float ViewDist;
 in vec3 Normal;
 in vec3 ViewPos;
 
+uniform sampler2D screenTexture;
+
 uniform vec3 sunDirection;
 uniform vec3 skyColor;
 uniform vec3 fogColor;
+uniform vec2 resolution;
 
 float luminance(vec3 color) {
     return dot(color, vec3(0.2125f, 0.7153f, 0.0721f));
@@ -71,5 +75,5 @@ void main()
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
 
-    fragColor = vec4(color, clamp(fresnel, 0.75, 1.0));
+    fragColor = vec4(color, 1.0/*clamp(fresnel, 0.75, 1.0)*/) * texture(screenTexture, gl_FragCoord.xy / resolution);
 }

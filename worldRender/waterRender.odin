@@ -52,10 +52,12 @@ setupWater :: proc(data: mesh.ChunkData) -> Buffers {
 	return {VAO, VBO, EBO}
 }
 
-drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render) {
+drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render, frameTexture: u32) {
 	gl.UseProgram(render.program)
+	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
+	gl.Uniform2f(render.uniforms["resolution"].location, camera.viewPort.x, camera.viewPort.y)
 	gl.Uniform3f(render.uniforms["sunDirection"].location, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z)
 	gl.Uniform3f(render.uniforms["skyColor"].location, sky.skyColor.r, sky.skyColor.g, sky.skyColor.b)
 	gl.Uniform3f(render.uniforms["fogColor"].location, sky.fogColor.r, sky.fogColor.g, sky.fogColor.b)

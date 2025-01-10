@@ -21,6 +21,8 @@ Render :: struct{
 	program: u32,
 	texture: u32,
 	depth: u32,
+	auxiliarTexture: u32,
+	auxiliarDepth: u32,
 }
 
 quadVertices := [?]f32{
@@ -60,8 +62,18 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-
 	gl.FramebufferTexture(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, render.depth, 0)
+
+	gl.ActiveTexture(gl.TEXTURE2)
+	gl.GenTextures(1, &render.auxiliarTexture)
+	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarTexture)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, render.auxiliarTexture, 0)
+
+	gl.DrawBuffers(2, raw_data([]u32{gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1}))
 
 	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != u32(gl.FRAMEBUFFER_COMPLETE) {
 		skeewb.console_log(.ERROR, "Framebuffer is not complete!")
@@ -96,13 +108,20 @@ resize :: proc(camera: ^util.Camera, render: Render) {
 	
 	gl.BindTexture(gl.TEXTURE_2D, render.depth)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
+	
+	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarTexture)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	
+	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarDepth)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
 }
 
 draw :: proc(render: Render) {
+	gl.UseProgram(render.program)
+
 	gl.Disable(gl.DEPTH_TEST)
 
 	gl.BindVertexArray(render.vao)
-	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
 	
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
