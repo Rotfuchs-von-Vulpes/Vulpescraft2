@@ -42,7 +42,7 @@ allChunks: [dynamic]worldRender.ChunkBuffer
 toRemashing: [dynamic][3]i32
 
 cameraSetup :: proc() {
-	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
+	playerCamera.proj = math.matrix4_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1, 10000)
 }
 
 cameraMove :: proc() {
@@ -200,7 +200,7 @@ main :: proc() {
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}
@@ -458,11 +458,8 @@ main :: proc() {
 			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		}
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
-		gl.DrawBuffer(gl.COLOR_ATTACHMENT1)
-		frameBuffer.draw(fboRender)
-		gl.Enable(gl.DEPTH_TEST)
-		gl.DrawBuffer(gl.COLOR_ATTACHMENT0)
-		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.auxiliarTexture)
+		frameBuffer.drawColorBuffer(fboRender)
+		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.auxiliarTexture, fboRender.auxiliarDepth)
 		
 		gl.Viewport(0, 0, screenWidth, screenHeight)
 		gl.UseProgram(fboRender.program)
@@ -506,6 +503,9 @@ main :: proc() {
 	for key, value in fboRender.uniforms {
 		delete(value.name)
 	}
+	for key, value in fboRender.auxiliarUniforms {
+		delete(value.name)
+	}
 	for key, value in skyRender.uniforms {
 		delete(value.name)
 	}
@@ -518,12 +518,14 @@ main :: proc() {
 	delete(blockRender.uniforms)
 	delete(waterRender.uniforms)
 	delete(fboRender.uniforms)
+	delete(fboRender.auxiliarUniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
 	delete(debugRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(waterRender.program)
 	gl.DeleteProgram(fboRender.program)
+	gl.DeleteProgram(fboRender.auxiliarProgram)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)

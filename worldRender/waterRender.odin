@@ -52,9 +52,14 @@ setupWater :: proc(data: mesh.ChunkData) -> Buffers {
 	return {VAO, VBO, EBO}
 }
 
-drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render, frameTexture: u32) {
+drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render, frameTexture, depthTexture: u32) {
 	gl.UseProgram(render.program)
+	gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
+	gl.Uniform1i(render.uniforms["depthTexture"].location, 1)
+	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
+	gl.ActiveTexture(gl.TEXTURE1)
+	gl.BindTexture(gl.TEXTURE_2D, depthTexture)
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
 	gl.Uniform2f(render.uniforms["resolution"].location, camera.viewPort.x, camera.viewPort.y)

@@ -7,6 +7,7 @@ in vec3 Normal;
 in vec3 ViewPos;
 
 uniform sampler2D screenTexture;
+uniform sampler2D depthTexture;
 
 uniform vec3 sunDirection;
 uniform vec3 skyColor;
@@ -72,8 +73,16 @@ void main()
     vec3 albedo = vec3(0.061, 0.16, 0.221);
     vec3 diffuse = CalculateLighting(albedo, Normal, vec2(0, 1), gl_FragCoord.xyz);
     vec3 color = mix(diffuse, fogColor, fogFactor);
+
+    vec3 belowColor = texture(screenTexture, gl_FragCoord.xy / resolution).rgb;
+
+    float depthDist1 = (0.1 * 10000.0) / (10000.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r * (10000.0 - 0.1));
+    float depthDist2 = (0.1 * 10000.0) / (10000.0 - gl_FragDepth * (10000.0 - 0.1));
+    float fogFactor2 = (5.0 - (depthDist1 - depthDist2)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+    fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
+    /*clamp(fresnel, 0.75, 1.0)*/
 
-    fragColor = vec4(color, 1.0/*clamp(fresnel, 0.75, 1.0)*/) * texture(screenTexture, gl_FragCoord.xy / resolution);
+    fragColor = vec4(color, 1.0) * vec4(mix(color, belowColor, fogFactor2), 1.0);
 }
