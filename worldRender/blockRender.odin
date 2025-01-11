@@ -106,6 +106,7 @@ setupBlocks :: proc(data: mesh.ChunkData) -> Buffers {
 }
 
 drawBlocks :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render) {
+	gl.DrawBuffers(2, raw_data([]u32{gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT2}))
 	gl.UseProgram(render.program)
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])

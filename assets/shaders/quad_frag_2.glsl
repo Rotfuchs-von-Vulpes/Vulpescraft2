@@ -6,9 +6,10 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 uniform sampler2D depthTexture;
+uniform sampler2D distanceTexture;
 
 void main()
 {
     FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
-    Depth = texture(depthTexture, TexCoords).r;
+    Depth = max(texture(depthTexture, TexCoords).r, texture(distanceTexture, TexCoords).r);
 }

@@ -42,7 +42,7 @@ allChunks: [dynamic]worldRender.ChunkBuffer
 toRemashing: [dynamic][3]i32
 
 cameraSetup :: proc() {
-	playerCamera.proj = math.matrix4_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1, 10000)
+	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 }
 
 cameraMove :: proc() {
@@ -209,7 +209,7 @@ main :: proc() {
 	worldRender.setupBlockDrawing(&blockRender)
 	worldRender.setupWaterDrawing(&waterRender)
 
-	gl.ClearColor(0.4666, 0.6588, 1.0, 1.0)
+	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
@@ -457,6 +457,7 @@ main :: proc() {
 			debug.draw(&playerCamera, debugRender)
 			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		}
+		frameBuffer.clearDepth(fboRender)
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
 		frameBuffer.drawColorBuffer(fboRender)
 		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.auxiliarTexture, fboRender.auxiliarDepth)

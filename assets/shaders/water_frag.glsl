@@ -2,7 +2,6 @@
 
 out vec4 fragColor;
 
-in float ViewDist;
 in vec3 Normal;
 in vec3 ViewPos;
 
@@ -66,7 +65,9 @@ vec3 CalculateLighting(vec3 albedo, vec3 normal, vec2 lightmapCoords, vec3 fragC
 
 void main()
 {
-    float fragDist = ViewDist / 3;
+    float viewDist = length(ViewPos);
+    // depth = (viewDist - 0.1) / viewDist;
+    float fragDist = viewDist / 3;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
@@ -76,9 +77,8 @@ void main()
 
     vec3 belowColor = texture(screenTexture, gl_FragCoord.xy / resolution).rgb;
 
-    float depthDist1 = (0.1 * 10000.0) / (10000.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r * (10000.0 - 0.1));
-    float depthDist2 = (0.1 * 10000.0) / (10000.0 - gl_FragDepth * (10000.0 - 0.1));
-    float fogFactor2 = (5.0 - (depthDist1 - depthDist2 + 3.0)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+    float depthDist1 = 0.1 / (1.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r);
+    float fogFactor2 = (5.0 - (depthDist1 - viewDist + 3.0)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
     fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));

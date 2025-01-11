@@ -53,6 +53,7 @@ setupWater :: proc(data: mesh.ChunkData) -> Buffers {
 }
 
 drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Render, frameTexture, depthTexture: u32) {
+	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT0}))
 	gl.UseProgram(render.program)
 	gl.Uniform1i(render.uniforms["screenTexture"].location, 0)
 	gl.Uniform1i(render.uniforms["depthTexture"].location, 1)

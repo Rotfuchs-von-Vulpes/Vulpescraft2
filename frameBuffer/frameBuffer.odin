@@ -137,11 +137,15 @@ resize :: proc(camera: ^util.Camera, render: Render) {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.R32F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RED, gl.FLOAT, nil)
 }
 
+clearDepth :: proc(render: Render) {
+	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT2}))
+	gl.Clear(gl.COLOR_BUFFER_BIT)
+}
+
 drawColorBuffer :: proc(render: Render) {
 	gl.UseProgram(render.auxiliarProgram)
 	gl.Uniform1i(render.auxiliarUniforms["screenTexture"].location, 0)
-	gl.Uniform1i(render.auxiliarUniforms["depthTexture"].location, 1)
-
+	gl.Uniform1i(render.auxiliarUniforms["distanceTexture"].location, 1)
 
 	gl.DrawBuffers(2, raw_data([]u32{gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2}))
 	gl.Disable(gl.DEPTH_TEST)
@@ -149,10 +153,9 @@ drawColorBuffer :: proc(render: Render) {
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
 	gl.ActiveTexture(gl.TEXTURE1)
-	gl.BindTexture(gl.TEXTURE_2D, render.depth)
+	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarDepth)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 	gl.Enable(gl.DEPTH_TEST)
-	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT0}))
 }
 
 draw :: proc(render: Render) {

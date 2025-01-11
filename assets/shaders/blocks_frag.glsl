@@ -1,6 +1,8 @@
 #version 330 core
 
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
+layout (location = 1) out float depth;
+
 in vec3 Pos;
 in vec3 Normal;
 in vec2 TexCoords;
@@ -82,9 +84,13 @@ void main()
 
     vec3 diffuse = CalculateLighting(albedo.rgb, Normal, Lightmap, gl_FragCoord.xyz);
 
+    float viewDist = length(Pos);
+    depth = (viewDist - 0.1) / viewDist;
+
     float fragDist = length(Pos) / 3;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
     fragColor = vec4(mix(diffuse, fogColor, fogFactor), albedo.a);
+    // fragColorCopy = vec4(fragColor.rgb, 1.0);
 }
