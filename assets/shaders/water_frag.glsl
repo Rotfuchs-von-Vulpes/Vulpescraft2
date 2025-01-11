@@ -78,11 +78,11 @@ void main()
 
     float depthDist1 = (0.1 * 10000.0) / (10000.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r * (10000.0 - 0.1));
     float depthDist2 = (0.1 * 10000.0) / (10000.0 - gl_FragDepth * (10000.0 - 0.1));
-    float fogFactor2 = (5.0 - (depthDist1 - depthDist2)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+    float fogFactor2 = (5.0 - (depthDist1 - depthDist2 + 3.0)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
     fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
     /*clamp(fresnel, 0.75, 1.0)*/
 
-    fragColor = vec4(color, 1.0) * vec4(mix(color, belowColor, fogFactor2), 1.0);
+    fragColor = vec4(mix(color, belowColor, fogFactor2), 1.0);
 }
