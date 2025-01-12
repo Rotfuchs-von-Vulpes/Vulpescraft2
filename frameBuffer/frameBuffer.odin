@@ -78,6 +78,8 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, render.blurTexture, 0)
 
@@ -87,6 +89,8 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.R32F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RED, gl.FLOAT, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, render.auxiliarDepth, 0)
 

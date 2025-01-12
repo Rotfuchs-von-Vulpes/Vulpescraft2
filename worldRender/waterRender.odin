@@ -1,11 +1,13 @@
 package worldRender
 
-import gl "vendor:OpenGL"
-import "vendor:sdl2"
-import stb "vendor:stb/image"
 import "core:strings"
 import glm "core:math/linalg/glsl"
 import math "core:math/linalg"
+import "core:time"
+
+import gl "vendor:OpenGL"
+import "vendor:sdl2"
+import stb "vendor:stb/image"
 
 import "../skeewb"
 import "../world"
@@ -15,6 +17,8 @@ import mesh "meshGenerator"
 
 waterVertShader :: #load("../assets/shaders/water_vert.glsl", string)
 waterFragShader :: #load("../assets/shaders/water_frag.glsl", string)
+
+tick := time.tick_now()
 
 setupWaterDrawing :: proc(render: ^Render) {
 	shaderSuccess: bool
@@ -61,6 +65,9 @@ drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Re
 	gl.BindTexture(gl.TEXTURE_2D, frameTexture)
 	gl.ActiveTexture(gl.TEXTURE1)
 	gl.BindTexture(gl.TEXTURE_2D, depthTexture)
+	duration := time.tick_since(tick)
+	timePassed := time.duration_seconds(duration)
+	gl.Uniform1f(render.uniforms["time"].location, f32(timePassed))
 	gl.UniformMatrix4fv(render.uniforms["projection"].location, 1, false, &camera.proj[0, 0])
 	gl.UniformMatrix4fv(render.uniforms["view"].location, 1, false, &camera.view[0, 0])
 	gl.Uniform2f(render.uniforms["resolution"].location, camera.viewPort.x, camera.viewPort.y)
@@ -73,6 +80,7 @@ drawWater :: proc(chunks: [dynamic]ChunkBuffer, camera: ^util.Camera, render: Re
 		model := math.matrix4_translate_f32(pos)
 		modelView := camera.view * model
 		
+		gl.Uniform3f(render.uniforms["chunkPosition"].location, f32(chunk.pos.x) * 16, f32(chunk.pos.y) * 16, f32(chunk.pos.z) * 16)
 		gl.UniformMatrix4fv(render.uniforms["model"].location, 1, false, &model[0, 0])
 		
 		gl.BindVertexArray(chunk.waterBuffer.VAO)

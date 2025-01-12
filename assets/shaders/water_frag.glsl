@@ -3,6 +3,7 @@
 out vec4 fragColor;
 
 in vec3 Normal;
+in vec3 Direction;
 in vec3 ViewPos;
 
 uniform sampler2D screenTexture;
@@ -75,10 +76,20 @@ void main()
     vec3 diffuse = CalculateLighting(albedo, Normal, vec2(0, 1), gl_FragCoord.xyz);
     vec3 color = mix(diffuse, fogColor, fogFactor);
 
-    vec3 belowColor = texture(screenTexture, gl_FragCoord.xy / resolution).rgb;
+    vec2 uv = (gl_FragCoord.xy + vec2(0.5)) / resolution;
+    vec2 uv2 = uv;
+    vec3 refr = refract(Direction, Normal, 1.0 / 1.333);
+    if (Direction.x != 0) {
+        uv2 += refr.yz;
+    } else if (Direction.y != 0) {
+        uv2 += refr.xz;
+    } else if (Direction.z != 0) {
+        uv2 += refr.xy;
+    }
+    vec3 belowColor = texture(screenTexture, uv2).rgb;
 
-    float depthDist1 = 0.1 / (1.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r);
-    float fogFactor2 = (15.0 - (depthDist1 - viewDist + 3.0)) / 15.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+    float depthDist1 = 0.1 / (1.0 - texture(depthTexture, uv2).r);
+    float fogFactor2 = (10.0 - (depthDist1 - viewDist + 3.0)) / 10.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
     fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
