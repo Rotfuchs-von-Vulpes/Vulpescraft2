@@ -27,6 +27,10 @@ toiVec3 :: proc(vec: vec3) -> iVec3 {
     }
 }
 
+isPLaceable :: proc(id: u16) -> bool {
+    return id != 0 && id != 8
+}
+
 raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
     fPos := origin
     pos, pPos, lastBlock: iVec3
@@ -43,25 +47,25 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
 
         if lastBlock != iPos {
             chunk, pos = getPosition(iPos)
-            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
+            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
                 if place {
                     offset := iPos - lastBlock
                     if abs(offset.x) + abs(offset.y) + abs(offset.z) != 1 {
                         if offset.x != 0 {
                             chunk, pos = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
-                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
+                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
                                 return chunk, pos, true
                             }
                         }
                         if offset.y != 0 {
                             chunk, pos = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
-                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
+                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
                                 return chunk, pos, true
                             }
                         }
                         if offset.z != 0 {
                             chunk, pos = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
-                            if ok && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 0 {
+                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
                                 return chunk, pos, true
                             }
                         }
