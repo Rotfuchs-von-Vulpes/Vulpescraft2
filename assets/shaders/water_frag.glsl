@@ -78,11 +78,11 @@ void main()
     vec3 belowColor = texture(screenTexture, gl_FragCoord.xy / resolution).rgb;
 
     float depthDist1 = 0.1 / (1.0 - texture(depthTexture, gl_FragCoord.xy / resolution).r);
-    float fogFactor2 = (5.0 - (depthDist1 - viewDist + 3.0)) / 5.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+    float fogFactor2 = (15.0 - (depthDist1 - viewDist + 3.0)) / 15.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
     fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
     
     float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
     /*clamp(fresnel, 0.75, 1.0)*/
 
-    fragColor = vec4(mix(color, belowColor, fogFactor2), 1.0);
+    fragColor = vec4(mix(color, mix(belowColor, belowColor * color, fogFactor2), fogFactor2), 1.0);
 }

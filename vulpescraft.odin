@@ -200,7 +200,7 @@ main :: proc() {
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}
@@ -459,8 +459,9 @@ main :: proc() {
 		}
 		frameBuffer.clearDepth(fboRender)
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
-		frameBuffer.drawColorBuffer(fboRender)
-		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.auxiliarTexture, fboRender.auxiliarDepth)
+		// frameBuffer.drawColorBuffer(fboRender)
+		frameBuffer.blurColorBuffer(&playerCamera, fboRender)
+		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.blurTexture, fboRender.auxiliarDepth)
 		
 		gl.Viewport(0, 0, screenWidth, screenHeight)
 		gl.UseProgram(fboRender.program)
@@ -507,6 +508,9 @@ main :: proc() {
 	for key, value in fboRender.auxiliarUniforms {
 		delete(value.name)
 	}
+	for key, value in fboRender.blurUniforms {
+		delete(value.name)
+	}
 	for key, value in skyRender.uniforms {
 		delete(value.name)
 	}
@@ -519,6 +523,7 @@ main :: proc() {
 	delete(blockRender.uniforms)
 	delete(waterRender.uniforms)
 	delete(fboRender.uniforms)
+	delete(fboRender.blurUniforms)
 	delete(fboRender.auxiliarUniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
@@ -526,6 +531,7 @@ main :: proc() {
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(waterRender.program)
 	gl.DeleteProgram(fboRender.program)
+	gl.DeleteProgram(fboRender.blurProgram)
 	gl.DeleteProgram(fboRender.auxiliarProgram)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
