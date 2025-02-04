@@ -1,6 +1,8 @@
 package util
 
 import "base:runtime"
+import "core:fmt"
+import "core:strings"
 import glm "core:math/linalg/glsl"
 
 mat4 :: glm.mat4x4
@@ -47,4 +49,27 @@ map_force_get :: proc(m: ^$T/map[$K]$V, key: K) -> (value: ^V, just_inserted: bo
     just_inserted = true
     value = (^V)(result)
     return
+}
+
+include :: proc (source: string, files: []string) -> string {
+    output := strings.clone(source)
+    for file in files {
+        line: string = ""
+        init := strings.index(output, "#include")
+        if init == -1 do return output
+        for i := init; i < len(output); i += 1 {
+            temp := strings.clone(line)
+            delete(line)
+            line = strings.concatenate({temp, string([]u8{output[i]})})
+            delete(temp)
+            if '\n' == output[i] do break
+        }
+        temp := strings.clone(output)
+        delete(output)
+        output, _ = strings.replace(temp, line, file, 1)
+        delete(temp)
+        delete(line)
+    }
+
+    return output
 }

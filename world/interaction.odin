@@ -1,6 +1,7 @@
 package world
 
 import math "core:math/linalg"
+import "core:fmt"
 
 getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
@@ -35,6 +36,8 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
     fPos := origin
     pos, pPos, lastBlock: iVec3
 
+    defer fmt.printfln("%d, %d, %d", pos.x, pos.y, pos.z)
+
     chunk: ^Chunk
     pChunk: ^Chunk
     ok: bool = true
@@ -51,6 +54,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
                 if place {
                     offset := iPos - lastBlock
                     if abs(offset.x) + abs(offset.y) + abs(offset.z) != 1 {
+                        fmt.printfln("corner %d, %d, %d", offset.x, offset.y, offset.z)
                         if offset.x != 0 {
                             chunk, pos = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
                             if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {

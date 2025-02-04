@@ -28,6 +28,9 @@ Render :: struct{
 	blurProgram: u32,
 	blurUniforms: map[string]gl.Uniform_Info,
 	blurTexture: u32,
+	AAProgram: u32,
+	AAUniforms: map[string]gl.Uniform_Info,
+	AATexture: u32,
 }
 
 quadVertices := [?]f32{
@@ -44,8 +47,10 @@ quadVertices := [?]f32{
 vertShader :: #load("../assets/shaders/quad_vert.glsl", string)
 fragShader :: #load("../assets/shaders/quad_frag.glsl", string)
 fragShader2 :: #load("../assets/shaders/quad_frag_2.glsl", string)
+AAShader :: #load("../assets/shaders/anti_alising_frag.glsl", string)
 vertBlurShader :: #load("../assets/shaders/quadBlur_vert.glsl", string)
 fragBlurShader :: #load("../assets/shaders/quadBlur_frag.glsl", string)
+fxaaShader :: #load("../assets/shaders/util/fxaa.glsl", string)
 
 setup :: proc(camera: ^util.Camera, render: ^Render) {
     gl.GenFramebuffers(1, &render.id)
@@ -97,7 +102,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
 	gl.ActiveTexture(gl.TEXTURE4)
 	gl.GenTextures(1, &render.auxiliarTexture)
 	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarTexture)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGB, gl.UNSIGNED_BYTE, nil)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, i32(camera.viewPort.x), i32(camera.viewPort.y), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -150,6 +155,19 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
     }
 	
 	render.blurUniforms = gl.get_uniforms_from_program(render.blurProgram)
+
+	temp := util.include(AAShader, {fxaaShader})
+	defer delete(temp)
+	render.AAProgram, shaderSuccess = gl.load_shaders_source(vertShader, temp)
+
+    if !shaderSuccess {
+        info: [^]u8
+        gl.GetShaderInfoLog(render.AAProgram, 1024, nil, info)
+        a, b, c, d := gl.get_last_error_messages()
+        skeewb.console_log(.ERROR, "could not compile blur fbo shaders\n %s\n %s", a, c)
+    }
+	
+	render.blurUniforms = gl.get_uniforms_from_program(render.blurProgram)
 }
 
 resize :: proc(camera: ^util.Camera, render: Render) {
@@ -179,6 +197,7 @@ drawColorBuffer :: proc(render: Render) {
 	// gl.Uniform1i(render.auxiliarUniforms["screenTexture"].location, 0)
 	// gl.Uniform1i(render.auxiliarUniforms["distanceTexture"].location, 1)
 	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT3}))
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	gl.Disable(gl.DEPTH_TEST)
 	gl.BindVertexArray(render.vao)
@@ -212,10 +231,23 @@ draw :: proc(render: Render) {
 	gl.UseProgram(render.program)
 
 	gl.Disable(gl.DEPTH_TEST)
+	gl.Disable(gl.BLEND)
 
 	gl.BindVertexArray(render.vao)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, render.texture)
 	
+	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT3}))
+	gl.Clear(gl.COLOR_BUFFER_BIT)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+}
+
+drawAA :: proc(render: Render) {
+	gl.UseProgram(render.AAProgram)
+
+	gl.BindVertexArray(render.vao)
+	gl.BindTexture(gl.TEXTURE_2D, render.auxiliarTexture)
+	gl.DrawArrays(gl.TRIANGLES, 0, 6)
+
+	gl.Enable(gl.BLEND)
 }

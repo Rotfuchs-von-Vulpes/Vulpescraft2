@@ -92,6 +92,7 @@ draw :: proc(camera: ^util.Camera, render: Render, time: f32) {
 	gl.Uniform3f(render.uniforms["fogColor"].location, fogColor.r, fogColor.g, fogColor.b)
 
     gl.BindVertexArray(render.vao)
+	gl.DrawBuffers(1, raw_data([]u32{gl.COLOR_ATTACHMENT0}))
     gl.DrawArrays(gl.TRIANGLES, 0, 6)
 }
 

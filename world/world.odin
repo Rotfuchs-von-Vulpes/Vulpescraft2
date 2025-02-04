@@ -135,9 +135,8 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
     for i in -1..=1 {
         for j in -1..=1 {
             for k in -1..=1 {
-                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), tempMap)
-
                 if i == 0 && j == 0 && k == 0 do continue
+                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), tempMap)
                 for x in 0..<16 {
                     if i == 1 && x != 0 do continue
                     if i == -1 && x != 15 do continue

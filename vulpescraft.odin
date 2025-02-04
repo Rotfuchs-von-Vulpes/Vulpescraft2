@@ -33,7 +33,7 @@ playerCamera := util.Camera{
 	{0, 1, 0}, 
 	{1, 0, 0}, 
 	{0, 1, 0}, 
-	{2 * f32(screenWidth), 2 * f32(screenHeight)}, 
+	{f32(screenWidth), f32(screenHeight)}, 
 	math.MATRIX4F32_IDENTITY, math.MATRIX4F32_IDENTITY
 }
 
@@ -195,12 +195,11 @@ main :: proc() {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
-	gl.Enable(gl.BLEND)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0, 0, {}, 0}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}
@@ -326,8 +325,8 @@ main :: proc() {
 				if event.window.event == .RESIZED {
 					screenWidth = event.window.data1
 					screenHeight = event.window.data2
-					playerCamera.viewPort.x = 2 * f32(screenWidth)
-					playerCamera.viewPort.y = 2 * f32(screenHeight)
+					playerCamera.viewPort.x = f32(screenWidth)
+					playerCamera.viewPort.y = f32(screenHeight)
 					playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 					frameBuffer.resize(&playerCamera, fboRender)
 				}
@@ -463,10 +462,11 @@ main :: proc() {
 		frameBuffer.blurColorBuffer(&playerCamera, fboRender)
 		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.blurTexture, fboRender.auxiliarDepth)
 		
-		gl.Viewport(0, 0, screenWidth, screenHeight)
+		// gl.Viewport(0, 0, screenWidth, screenHeight)
 		gl.UseProgram(fboRender.program)
-		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 		frameBuffer.draw(fboRender)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		frameBuffer.drawAA(fboRender)
 		hud.draw(screenWidth, screenHeight, index, fboRender.texture, blockRender.texture)
 
 		sdl2.GL_SwapWindow(window)
@@ -511,6 +511,9 @@ main :: proc() {
 	for key, value in fboRender.blurUniforms {
 		delete(value.name)
 	}
+	for key, value in fboRender.AAUniforms {
+		delete(value.name)
+	}
 	for key, value in skyRender.uniforms {
 		delete(value.name)
 	}
@@ -524,6 +527,7 @@ main :: proc() {
 	delete(waterRender.uniforms)
 	delete(fboRender.uniforms)
 	delete(fboRender.blurUniforms)
+	delete(fboRender.AAUniforms)
 	delete(fboRender.auxiliarUniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
@@ -533,6 +537,7 @@ main :: proc() {
 	gl.DeleteProgram(fboRender.program)
 	gl.DeleteProgram(fboRender.blurProgram)
 	gl.DeleteProgram(fboRender.auxiliarProgram)
+	gl.DeleteProgram(fboRender.AAProgram)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)

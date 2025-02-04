@@ -17,12 +17,15 @@ import mesh "meshGenerator"
 
 waterVertShader :: #load("../assets/shaders/water_vert.glsl", string)
 waterFragShader :: #load("../assets/shaders/water_frag.glsl", string)
+lightingShader :: #load("../assets/shaders/util/lighting.glsl", string)
 
 tick := time.tick_now()
 
 setupWaterDrawing :: proc(render: ^Render) {
 	shaderSuccess: bool
-	render.program, shaderSuccess = gl.load_shaders_source(waterVertShader, waterFragShader)
+	temp := util.include(waterFragShader, {lightingShader})
+	defer delete(temp)
+	render.program, shaderSuccess = gl.load_shaders_source(waterVertShader, temp)
 
     if !shaderSuccess {
         info: [^]u8
