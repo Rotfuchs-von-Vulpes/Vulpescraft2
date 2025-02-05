@@ -28,7 +28,7 @@ void main()
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
-    vec3 albedo = vec3(0.061, 0.16, 0.221);
+    vec3 albedo = vec3(0.015, 0.04, 0.055);
     vec3 diffuse = CalculateLighting(albedo, Normal, vec2(0, 1), gl_FragCoord.xyz);
     vec3 color = mix(diffuse, fogColor, fogFactor);
 
