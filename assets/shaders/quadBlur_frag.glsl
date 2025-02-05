@@ -10,7 +10,7 @@ uniform int axis;
 
 void main()
 {
-    float r = 5;
+    float r = 3;
     float x, y, rr = r * r, d, w, w0;
     vec2 p = TexCoords;
     vec4 col = vec4(0);
