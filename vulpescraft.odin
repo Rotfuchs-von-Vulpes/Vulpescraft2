@@ -199,7 +199,7 @@ main :: proc() {
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0, 0, {}, 0}
+	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0, 0, {}}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}

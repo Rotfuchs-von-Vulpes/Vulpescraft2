@@ -30,7 +30,6 @@ Render :: struct{
 	blurTexture: u32,
 	AAProgram: u32,
 	AAUniforms: map[string]gl.Uniform_Info,
-	AATexture: u32,
 }
 
 quadVertices := [?]f32{
@@ -167,7 +166,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
         skeewb.console_log(.ERROR, "could not compile blur fbo shaders\n %s\n %s", a, c)
     }
 	
-	render.blurUniforms = gl.get_uniforms_from_program(render.blurProgram)
+	render.AAUniforms = gl.get_uniforms_from_program(render.AAProgram)
 }
 
 resize :: proc(camera: ^util.Camera, render: Render) {
