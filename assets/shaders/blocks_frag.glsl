@@ -34,7 +34,7 @@ void main()
     float viewDist = length(Pos);
     depth = (viewDist - 0.1) / viewDist;
 
-    float fragDist = length(Pos) / 3;
+    float fragDist = length(Pos) / 4;
     float fogFactor = 1.0 - exp(fragDist * fragDist * -0.005);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
 
