@@ -128,6 +128,7 @@ setup :: proc() {
         gl.GetShaderInfoLog(render.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile sky shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	render.uniforms = gl.get_uniforms_from_program(render.program)
@@ -152,6 +153,7 @@ setup :: proc() {
         gl.GetShaderInfoLog(blocksRender.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile sky shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	blocksRender.uniforms = gl.get_uniforms_from_program(blocksRender.program)

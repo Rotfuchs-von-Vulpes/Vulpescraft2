@@ -129,6 +129,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
         gl.GetShaderInfoLog(render.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile fbo shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	render.uniforms = gl.get_uniforms_from_program(render.program)
@@ -140,6 +141,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
         gl.GetShaderInfoLog(render.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile auxiliar fbo shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	render.auxiliarUniforms = gl.get_uniforms_from_program(render.auxiliarProgram)
@@ -151,6 +153,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
         gl.GetShaderInfoLog(render.program, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile blur fbo shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	render.blurUniforms = gl.get_uniforms_from_program(render.blurProgram)
@@ -164,6 +167,7 @@ setup :: proc(camera: ^util.Camera, render: ^Render) {
         gl.GetShaderInfoLog(render.AAProgram, 1024, nil, info)
         a, b, c, d := gl.get_last_error_messages()
         skeewb.console_log(.ERROR, "could not compile blur fbo shaders\n %s\n %s", a, c)
+		panic("")
     }
 	
 	render.AAUniforms = gl.get_uniforms_from_program(render.AAProgram)
