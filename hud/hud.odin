@@ -197,7 +197,7 @@ draw :: proc(width, height: i32, index: int, frameTexture, blocksTextures: u32) 
 	gl.BindTexture(gl.TEXTURE_2D, render.hotbarTexture)
 	gl.DrawArrays(gl.TRIANGLES, 0, 6)
 
-	gl.Uniform1f(render.uniforms["xOffset"].location, (f32(index) - 4) * 80 / f32(width))
+	gl.Uniform1f(render.uniforms["xOffset"].location, (f32(8 - index) - 4) * 80 / f32(width))
 	gl.Uniform1f(render.uniforms["yOffset"].location, f32(height - 44) / f32(height))
 	gl.Uniform1f(render.uniforms["width"].location, 48 / f32(width))
 	gl.Uniform1f(render.uniforms["height"].location, 48 / f32(height))

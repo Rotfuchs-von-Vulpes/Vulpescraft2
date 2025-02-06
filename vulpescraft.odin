@@ -240,7 +240,7 @@ main :: proc() {
 
 	looking := true
 
-	index := 2
+	index := 0
 
 	loop: for {
 		duration := time.tick_since(start_tick)
@@ -343,7 +343,7 @@ main :: proc() {
 						reloadChunks(true)
 					}
 				} else if event.button.button == 3 {
-					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front, u16(8 - index) + 1)
+					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1)
 					defer delete(chunksToDelete)
 					if ok {
 						worldRender.destroy(chunksToDelete)
@@ -355,7 +355,7 @@ main :: proc() {
 					}
 				}
 			} else if event.type == .MOUSEWHEEL {
-				if event.wheel.y > 0 {
+				if event.wheel.y < 0 {
 					index += 1
 					if index > 8 do index = 0
 				} else {
