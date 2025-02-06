@@ -28,69 +28,104 @@ toiVec3 :: proc(vec: vec3) -> iVec3 {
     }
 }
 
+signalum :: proc(vec: iVec3) -> iVec3 {
+    res := iVec3{0, 0, 0}
+    for axis, idx in vec {
+        if axis > 0 do res[idx] = 1
+        if axis < 0 do res[idx] = -1
+    }
+    return res
+}
+
 isPLaceable :: proc(id: u16) -> bool {
-    return id != 0 && id != 8
+    return id == 0 || id == 8
 }
 
 raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
-    fPos := origin
-    pos, pPos, lastBlock: iVec3
-
-    defer fmt.printfln("%d, %d, %d", pos.x, pos.y, pos.z)
-
-    chunk: ^Chunk
-    pChunk: ^Chunk
-    ok: bool = true
-
     step: f32 = 0.05
-    length: f32 = 0
     maxLength: f32 = 10
-    for length < maxLength {
+
+    lastBlockSet := false
+    lastBlock, pos, sidePos: iVec3
+
+    length: f32 = 0
+    for length <= maxLength {
+        fPos := origin + direction * length
         iPos := toiVec3(fPos)
 
-        if lastBlock != iPos {
-            chunk, pos = getPosition(iPos)
-            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
-                if place {
-                    offset := iPos - lastBlock
-                    if abs(offset.x) + abs(offset.y) + abs(offset.z) != 1 {
-                        fmt.printfln("corner %d, %d, %d", offset.x, offset.y, offset.z)
+        if lastBlockSet && (iPos.x == lastBlock.x && iPos.y == lastBlock.y && iPos.z == lastBlock.z) {
+            length += step
+            continue
+        }
+
+        chunk, blockPos := getPosition(iPos)
+        blockID := chunk.primer[blockPos.x + 1][blockPos.y + 1][blockPos.z + 1].id
+        if !isPLaceable(blockID) {
+            pos = blockPos
+            offset: iVec3 = {0, 0, 0}
+            canPlaceAtSide := false
+            if lastBlockSet {
+                offset = signalum(lastBlock - iPos)
+
+                if math.abs(offset.x) + math.abs(offset.y) + math.abs(offset.z) != 1 {
+                    findBestAxis: {
                         if offset.x != 0 {
-                            chunk, pos = getPosition({iPos.x + offset.x, iPos.y, iPos.z})
-                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
-                                return chunk, pos, true
+                            chunk2, posB := getPosition({iPos.x + offset.x, iPos.y, iPos.z})
+                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            if isPLaceable(b) {
+                                if place do chunk = chunk2
+                                if place do pos = posB
+                                offset.y = 0
+                                offset.z = 0
+                                canPlaceAtSide = true
+                                break findBestAxis
                             }
                         }
                         if offset.y != 0 {
-                            chunk, pos = getPosition({iPos.x, iPos.y + offset.y, iPos.z})
-                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
-                                return chunk, pos, true
+                            chunk2, posB := getPosition({iPos.x, iPos.y + offset.y, iPos.z})
+                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            if isPLaceable(b) {
+                                if place do chunk = chunk2
+                                if place do pos = posB
+                                offset.x = 0
+                                offset.z = 0
+                                canPlaceAtSide = true
+                                break findBestAxis
                             }
                         }
-                        if offset.z != 0 {
-                            chunk, pos = getPosition({iPos.x, iPos.y, iPos.z + offset.z})
-                            if ok && isPLaceable(chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id) {
-                                return chunk, pos, true
+                        if offset.x != 0 {
+                            chunk2, posB := getPosition({iPos.x, iPos.y, iPos.z + offset.z})
+                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            if isPLaceable(b) {
+                                if place do chunk = chunk2
+                                if place do pos = posB
+                                offset.x = 0
+                                offset.y = 0
+                                canPlaceAtSide = true
+                                break findBestAxis
                             }
                         }
-                    } else {
-                        return pChunk, pPos, true
+                        offset = {0, 0, 0}
                     }
-                } else {
-                    return chunk, pos, true
                 }
             }
 
-            lastBlock = iPos
-        }
+            if !canPlaceAtSide {
+                chunk2, posB := getPosition(iPos + offset)
+                b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                canPlaceAtSide = isPLaceable(b)
+                if place do chunk = chunk2
+                if place do pos = posB
+            }
 
-        pPos = pos
-        pChunk = chunk
-        fPos += step * direction
+            return chunk, pos, true
+        }
+        lastBlock = iPos
+        lastBlockSet = true
         length += step
     }
 
-    return chunk, pos, false
+    return nil, pos, false
 }
 
 atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
