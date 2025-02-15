@@ -199,7 +199,6 @@ main :: proc() {
 
 	blockRender := worldRender.Render{{}, 0, 0}
 	waterRender := worldRender.Render{{}, 0, 0}
-	fboRender := frameBuffer.Render{0, 0, 0, {}, 0, 0, 0, 0, {}, 0, 0, 0, {}, 0, 0, {}}
 	skyRender := sky.Render{0, 0, {}, 0, 0}
 	sunRender := sky.Render{0, 0, {}, 0, 0}
 	debugRender := debug.Render{{}, 0}
@@ -213,7 +212,7 @@ main :: proc() {
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 	playerCamera.view = math.matrix4_look_at_f32({0, 0, 0}, playerCamera.front, playerCamera.up)
 
-	frameBuffer.setup(&playerCamera, &fboRender)
+	frameBuffer.setup(&playerCamera)
 	hud.setup()
 
 	sky.setup(&playerCamera, &skyRender)
@@ -328,7 +327,7 @@ main :: proc() {
 					playerCamera.viewPort.x = f32(screenWidth)
 					playerCamera.viewPort.y = f32(screenHeight)
 					playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
-					frameBuffer.resize(&playerCamera, fboRender)
+					frameBuffer.resize(&playerCamera)
 				}
 			} else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
@@ -441,8 +440,8 @@ main :: proc() {
 			}
 		}
 
-		gl.UseProgram(fboRender.program)
-		gl.BindFramebuffer(gl.FRAMEBUFFER, fboRender.id)
+		gl.UseProgram(frameBuffer.render.program)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, frameBuffer.render.id)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		gl.Viewport(0, 0, i32(playerCamera.viewPort.x), i32(playerCamera.viewPort.y))
@@ -456,18 +455,17 @@ main :: proc() {
 			debug.draw(&playerCamera, debugRender)
 			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		}
-		frameBuffer.clearDepth(fboRender)
+		frameBuffer.clearDepth()
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
 		// frameBuffer.drawColorBuffer(fboRender)
-		frameBuffer.blurColorBuffer(&playerCamera, fboRender)
-		worldRender.drawWater(chunks, &playerCamera, waterRender, fboRender.blurTexture, fboRender.auxiliarDepth)
+		frameBuffer.blurColorBuffer(&playerCamera)
+		worldRender.drawWater(chunks, &playerCamera, waterRender, frameBuffer.render.blurColorBuffer.texture, frameBuffer.render.auxiliarDepth.texture)
 		
 		// gl.Viewport(0, 0, screenWidth, screenHeight)
-		gl.UseProgram(fboRender.program)
-		frameBuffer.draw(fboRender)
+		frameBuffer.draw()
 		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-		frameBuffer.drawAA(fboRender)
-		hud.draw(screenWidth, screenHeight, index, fboRender.texture, blockRender.texture)
+		frameBuffer.drawAA()
+		hud.draw(screenWidth, screenHeight, index, frameBuffer.render.colorBuffer.texture, blockRender.texture)
 
 		sdl2.GL_SwapWindow(window)
 		
@@ -495,23 +493,12 @@ main :: proc() {
 	hud.nuke()
 	worldRender.nuke()
 	world.nuke()
+	frameBuffer.nuke()
 
 	for key, value in blockRender.uniforms {
 		delete(value.name)
 	}
 	for key, value in waterRender.uniforms {
-		delete(value.name)
-	}
-	for key, value in fboRender.uniforms {
-		delete(value.name)
-	}
-	for key, value in fboRender.auxiliarUniforms {
-		delete(value.name)
-	}
-	for key, value in fboRender.blurUniforms {
-		delete(value.name)
-	}
-	for key, value in fboRender.AAUniforms {
 		delete(value.name)
 	}
 	for key, value in skyRender.uniforms {
@@ -525,23 +512,14 @@ main :: proc() {
 	}
 	delete(blockRender.uniforms)
 	delete(waterRender.uniforms)
-	delete(fboRender.uniforms)
-	delete(fboRender.blurUniforms)
-	delete(fboRender.AAUniforms)
-	delete(fboRender.auxiliarUniforms)
 	delete(skyRender.uniforms)
 	delete(sunRender.uniforms)
 	delete(debugRender.uniforms)
 	gl.DeleteProgram(blockRender.program)
 	gl.DeleteProgram(waterRender.program)
-	gl.DeleteProgram(fboRender.program)
-	gl.DeleteProgram(fboRender.blurProgram)
-	gl.DeleteProgram(fboRender.auxiliarProgram)
-	gl.DeleteProgram(fboRender.AAProgram)
 	gl.DeleteProgram(skyRender.program)
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)
-	gl.DeleteFramebuffers(1, &fboRender.id)
 	delete(toRemashing)
 	delete(allChunks)
 	delete(chunks)
