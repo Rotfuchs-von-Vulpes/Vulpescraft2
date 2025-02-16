@@ -457,14 +457,13 @@ main :: proc() {
 		}
 		frameBuffer.clearDepth()
 		worldRender.drawBlocks(chunks, &playerCamera, blockRender)
-		// frameBuffer.drawColorBuffer(fboRender)
-		frameBuffer.blurColorBuffer(&playerCamera)
+		frameBuffer.drawBlur()
 		worldRender.drawWater(chunks, &playerCamera, waterRender, frameBuffer.render.blurColorBuffer.texture, frameBuffer.render.auxiliarDepth.texture)
 		
-		// gl.Viewport(0, 0, screenWidth, screenHeight)
-		frameBuffer.draw()
-		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		frameBuffer.colorEffect()
 		frameBuffer.drawAA()
+		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		frameBuffer.draw()
 		hud.draw(screenWidth, screenHeight, index, frameBuffer.render.colorBuffer.texture, blockRender.texture)
 
 		sdl2.GL_SwapWindow(window)

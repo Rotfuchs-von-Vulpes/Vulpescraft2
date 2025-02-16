@@ -5,7 +5,6 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 
-uniform vec2 resolution;
 uniform int axis;
 
 void main()
@@ -17,11 +16,11 @@ void main()
 
     w0 = 0.5135 / pow(r, 0.96);
 
-    if (axis==0) for (d = 1.0 / resolution.x, x = -r, p.x += x*d; x<=r; x++, p.x += d){
+    if (axis==0) for (d = 1.0 / textureSize(screenTexture, 0).x, x = -r, p.x += x*d; x<=r; x++, p.x += d){
         w = w0 * exp((-x * x) / (2.0 * rr));
         col += texture2D(screenTexture, p) * w;
     }
-    if (axis==1) for (d = 1.0 / resolution.y, y = -r, p.y += y*d; y<=r; y++, p.y += d){
+    if (axis==1) for (d = 1.0 / textureSize(screenTexture, 0).y, y = -r, p.y += y*d; y<=r; y++, p.y += d){
         w = w0 * exp((-y * y) / (2.0 * rr));
         col += texture2D(screenTexture, p) * w;
     }
