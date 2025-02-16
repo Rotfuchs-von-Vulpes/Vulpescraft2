@@ -15,7 +15,6 @@ import mesh "meshGenerator"
 
 blockVertShader :: #load("../assets/shaders/blocks_vert.glsl", string)
 blockFragShader :: #load("../assets/shaders/blocks_frag.glsl", string)
-tonemapping :: #load("../assets/shaders/util/tone_mapping.glsl", string)
 lighting :: #load("../assets/shaders/util/lighting.glsl", string)
 
 madera :: #load("../assets/textures/box.png", string)
@@ -32,7 +31,7 @@ glow :: #load("../assets/textures/glowstone.png", string)
 
 setupBlockDrawing :: proc(render: ^Render) {
 	shaderSuccess: bool
-	temp := util.include(blockFragShader, {tonemapping, lighting})
+	temp := util.include(blockFragShader, {lighting})
 	defer delete(temp)
 	render.program, shaderSuccess = gl.load_shaders_source(blockVertShader, temp)
 
