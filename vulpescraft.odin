@@ -284,7 +284,7 @@ main :: proc() {
 				xpos :=  f32(event.motion.xrel)
 				ypos := -f32(event.motion.yrel)
 			
-				sensitivity: f32 = 0.25
+				sensitivity: f32 = 0.0625
 				xoffset := xpos * sensitivity
 				yoffset := ypos * sensitivity
 			
