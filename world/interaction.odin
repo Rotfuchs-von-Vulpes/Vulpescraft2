@@ -136,6 +136,7 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
             for k in -1..=1 {
                 c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &allChunks)
                 c.level = .Trees
+                seeSides(c)
                 append(&chunks, c)
             }
         }
@@ -154,21 +155,6 @@ destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
 
     if !ok {return chunks, pos, false}
     chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 0
-    if pos.x == 0 {
-        chunk.opened += {.West}
-    } else if pos.x == 15 {
-        chunk.opened += {.East}
-    }
-    if pos.y == 0 {
-        chunk.opened += {.Bottom}
-    } else if pos.y == 15 {
-        chunk.opened += {.Up}
-    }
-    if pos.z == 0 {
-        chunk.opened += {.South}
-    } else if pos.z == 15 {
-        chunk.opened += {.North}
-    }
 
     chunks = atualizeChunks(chunk, pos)
 
@@ -181,21 +167,6 @@ place :: proc(origin, direction: vec3, block: u16) -> ([dynamic]^Chunk, iVec3, b
 
     if !ok {return chunks, pos, false}
     chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
-    if pos.x == 0 {
-        chunk.opened += {.West}
-    } else if pos.x == 15 {
-        chunk.opened += {.East}
-    }
-    if pos.y == 0 {
-        chunk.opened += {.Bottom}
-    } else if pos.y == 15 {
-        chunk.opened += {.Up}
-    }
-    if pos.z == 0 {
-        chunk.opened += {.South}
-    } else if pos.z == 15 {
-        chunk.opened += {.North}
-    }
     
     chunks = atualizeChunks(chunk, pos)
 

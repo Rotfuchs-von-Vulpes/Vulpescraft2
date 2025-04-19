@@ -8,6 +8,7 @@ Light :: struct{
 }
 
 allLight :: proc(chunk: ^Chunk) {
+    if chunk.level != .Trees do return
     for x in 0..<16 {
         for y in 0..<16 {
             for z in 0..<16 {
@@ -15,9 +16,10 @@ allLight :: proc(chunk: ^Chunk) {
             }
         }
     }
+    chunk.level = .InternalLight
 }
 
-sunlight :: proc(chunk, topChunk: ^Chunk) {
+sunlight :: proc(chunk: ^Chunk) {
     if chunk.level != .Trees do return
     cache: [16][16][16]u8
     solidCache: [16][16][16]bool
@@ -48,9 +50,7 @@ sunlight :: proc(chunk, topChunk: ^Chunk) {
 
                 top := u8(15)
                 if y == 15 {
-                    if topChunk != nil {
-                        top = topChunk.primer[x + 1][1][z + 1].light.y
-                    }
+                    top = 15
                 } else {
                     top = cache[x][y + 1][z]
                 }
@@ -102,7 +102,7 @@ sunlight :: proc(chunk, topChunk: ^Chunk) {
 }
 
 iluminate :: proc(chunk: ^Chunk) {
-    if chunk.level != .ExternalTrees do return
+    if chunk.level != .SidesClone do return
 
     emissiveCache := [dynamic]Light{}
     defer delete(emissiveCache)

@@ -23,7 +23,7 @@ Direction :: enum {Up, Bottom, North, South, East, West}
 FaceSet :: bit_set[Direction]
 
 
-GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, ExternalTrees, ExternalLight}
+GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, SidesClone, ExternalLight, Final}
 Chunk :: struct {
     pos: iVec3,
     primer: Primer,
@@ -48,6 +48,17 @@ getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
     chunk.remeshing = false
 }
 
+seeSides :: proc(chunk: ^Chunk) {
+    for i in 0..<16 do for j in 0..<16 {
+        if chunk.primer[i + 1][j + 1][ 0].id == 0 do chunk.opened += {.South}
+        if chunk.primer[i + 1][j + 1][15].id == 0 do chunk.opened += {.North}
+        if chunk.primer[i + 1][ 0][j + 1].id == 0 do chunk.opened += {.Bottom}
+        if chunk.primer[i + 1][15][j + 1].id == 0 do chunk.opened += {.Up}
+        if chunk.primer[ 0][i + 1][j + 1].id == 0 do chunk.opened += {.West}
+        if chunk.primer[15][i + 1][j + 1].id == 0 do chunk.opened += {.East}
+    }
+}
+
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     empty := true
     for i in 0..<16 {
@@ -57,23 +68,6 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
             topHeight := min(height, 15)
             for k in 0..<16 {
                 chunk.primer[i + 1][k + 1][j + 1].light = {0, 0}
-                if k >= localHeight {
-                    if k == 0 {
-                        chunk.opened += {.Bottom}
-                    } else if k == 15 {
-                        chunk.opened += {.Up}
-                    }
-                    if i == 0 {
-                        chunk.opened += {.West}
-                    } else if i == 15 {
-                        chunk.opened += {.East}
-                    }
-                    if j == 0 {
-                        chunk.opened += {.South}
-                    } else if j == 15 {
-                        chunk.opened += {.North}
-                    }
-                }
                 if localHeight - k > 0 {
                     empty = false
                     if height > 15 {
@@ -103,6 +97,7 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
 
     chunk.isEmpty = empty
     chunk.level = .Blocks
+    seeSides(chunk)
 }
 
 eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
@@ -131,7 +126,7 @@ history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
 calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
-    if chunk.level != .ExternalTrees do return
+    if chunk.level != .InternalLight do return
     for i in -1..=1 {
         for j in -1..=1 {
             for k in -1..=1 {
@@ -156,17 +151,19 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
             }
         }
     }
+
+    chunk.level = .SidesClone
 }
 
-genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
+genPoll :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
     if history[pos] do return nil
     chunk := eval(pos.x, pos.y, pos.z, tempMap)
-    if chunk.level != .ExternalLight {
+    if chunk.level != .Final {
         for i in -2..=2 {
             for j in -2..=2 {
                 for k in -2..=2 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    if !c.isEmpty do populate(c, tempMap)
+                    populate(c, tempMap)
                 }
             }
         }
@@ -177,33 +174,14 @@ genPoll :: proc(center, pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
                     if c.isEmpty {
                         allLight(c)
                     } else {
-                        sunlight(c, eval(pos.x + i32(i), pos.y + i32(j + 1), pos.z + i32(k), tempMap))
+                        sunlight(c)
                     }
                 }
             }
         }
-        chunk.level = .ExternalTrees
         calcSides(chunk, tempMap)
         iluminate(chunk)
-    }
-
-    if .West in chunk.opened && sqDist(pos + {-1, 0, 0}, center, VIEW_DISTANCE) && pos + {-1, 0, 0} not_in history {
-        append(&genStack, iVec3{pos.x - 1, pos.y, pos.z})
-    }
-    if .East in chunk.opened && sqDist(pos + {1, 0, 0}, center, VIEW_DISTANCE) && pos + {1, 0, 0} not_in history {
-        append(&genStack, iVec3{pos.x + 1, pos.y, pos.z})
-    }
-    if .Bottom in chunk.opened && sqDist(pos + {0,-1, 0}, center, VIEW_DISTANCE) && pos + {0,-1, 0} not_in history {
-        append(&genStack, iVec3{pos.x, pos.y - 1, pos.z})
-    }
-    if .Up in chunk.opened && sqDist(pos + {0, 1, 0}, center, VIEW_DISTANCE) && pos + {0, 1, 0} not_in history {
-        append(&genStack, iVec3{pos.x, pos.y + 1, pos.z})
-    }
-    if .South in chunk.opened && sqDist(pos + {0, 0,-1}, center, VIEW_DISTANCE) && pos + {0, 0,-1} not_in history {
-        append(&genStack, iVec3{pos.x, pos.y, pos.z - 1})
-    }
-    if .North in chunk.opened && sqDist(pos + {0, 0, 1}, center, VIEW_DISTANCE) && pos + {0, 0, 1} not_in history {
-        append(&genStack, iVec3{pos.x, pos.y, pos.z + 1})
+        chunk.level = .Final
     }
 
     return chunk

@@ -59,12 +59,14 @@ chunks_chan: chan.Chan(^world.Chunk)
 highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
-generateChunk :: proc(center, pos: [3]i32) {
-	chunk := world.genPoll(center, pos, &world.allChunks)
+generateChunk :: proc(pos: [3]i32) -> world.FaceSet {
+	chunk := world.genPoll(pos, &world.allChunks)
 	if chunk != nil && !world.history[chunk.pos] {
 		if !chunk.isEmpty do chan.send(chunks_chan, chunk)
 		world.history[chunk.pos] = true
-	} 
+		return chunk.opened
+	}
+	return {}
 }
 
 generateChunkBlocks :: proc(^thread.Thread) {
@@ -75,7 +77,7 @@ generateChunkBlocks :: proc(^thread.Thread) {
 				pos, ok := chan.try_recv(highPriority_chan)
 				if !ok do break
 				world.history[pos] = false
-				generateChunk(work.chunkPosition, pos)
+				generateChunk(pos)
 			}
 		}
 
@@ -91,10 +93,19 @@ generateChunkBlocks :: proc(^thread.Thread) {
 					pos, ok := chan.try_recv(highPriority_chan)
 					if !ok do break
 					world.history[pos] = false
-					generateChunk(work.chunkPosition, pos)
+					generateChunk(pos)
 				}
 			}
-			generateChunk(work.chunkPosition, pos)
+			sides := generateChunk(pos)
+			dist := work.chunkPosition - pos
+			if dist.x * dist.x + dist.y * dist.y + dist.z * dist.z < 9*9 {
+				if .Bottom in sides do append(&world.genStack, pos + {0, -1, 0})
+				if .Up in sides do append(&world.genStack, pos + {0, 1, 0})
+				if .South in sides do append(&world.genStack, pos + {0, 0, -1})
+				if .North in sides do append(&world.genStack, pos + {0, 0, 1})
+				if .West in sides do append(&world.genStack, pos + {-1, 0, 0})
+				if .East in sides do append(&world.genStack, pos + {1, 0, 0})
+			}
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
