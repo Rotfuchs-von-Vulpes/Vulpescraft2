@@ -60,7 +60,6 @@ highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
 generateChunk :: proc(pos: [3]i32) -> world.FaceSet {
-	skeewb.console_log(.DEBUG, "generating...")
 	chunk := world.genPoll(pos, &world.allChunks)
 	if chunk != nil && !world.history[chunk.pos] {
 		if !chunk.isEmpty do chan.send(chunks_chan, chunk)
@@ -291,9 +290,9 @@ main :: proc() {
 						toLeft = true
 					case .D:
 						toRight = true
-					case .Q:
-						c := world.allChunks[playerCamera.chunk]
-						fmt.printfln("chunk pos: %d, %d, %d. level: %d", c.pos.x, c.pos.y, c.pos.z, c.level)
+					// case .Q:
+					// 	c := world.allChunks[playerCamera.chunk]
+					// 	fmt.printfln("chunk pos: %d, %d, %d. level: %d", c.pos.x, c.pos.y, c.pos.z, c.level)
 				}
 			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
