@@ -143,6 +143,7 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
     }
 
     for &chunk in chunks {
+        history[chunk.pos] = false
         chunk.remeshing = true
     }
 
