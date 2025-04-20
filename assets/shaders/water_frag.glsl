@@ -45,11 +45,15 @@ void main()
     vec3 belowColor = texture(screenTexture, uv2).rgb;
 
     float depthDist1 = 0.1 / (1.0 - texture(depthTexture, uv2).r);
-    float fogFactor2 = (10.0 - (depthDist1 - viewDist + 3.0)) / 10.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
-    fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
-    
-    float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
-    /*clamp(fresnel, 0.75, 1.0)*/
+    if (depthDist1 < viewDist) {
+        fragColor = vec4(color, 1.0);
+    } else {
+        float fogFactor2 = (10.0 - (depthDist1 - viewDist + 3.0)) / 10.0; // 1.0 - exp(fragDist2 * fragDist2 * -0.005);
+        fogFactor2 = clamp(fogFactor2, 0.0, 1.0);
+        
+        float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-Normal, normalize(ViewPos))), 5.0)));
+        /*clamp(fresnel, 0.75, 1.0)*/
 
-    fragColor = vec4(mix(color, mix(belowColor, belowColor * color, fogFactor2), fogFactor2), 1.0);
+        fragColor = vec4(mix(color, mix(belowColor, belowColor * color, fogFactor2), fogFactor2), 1.0);
+    }
 }

@@ -167,6 +167,7 @@ place :: proc(origin, direction: vec3, block: u16) -> ([dynamic]^Chunk, iVec3, b
 
     if !ok {return chunks, pos, false}
     chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
+    chunk.isEmpty = false
     
     chunks = atualizeChunks(chunk, pos)
 

@@ -60,6 +60,7 @@ highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
 generateChunk :: proc(pos: [3]i32) -> world.FaceSet {
+	skeewb.console_log(.DEBUG, "generating...")
 	chunk := world.genPoll(pos, &world.allChunks)
 	if chunk != nil && !world.history[chunk.pos] {
 		if !chunk.isEmpty do chan.send(chunks_chan, chunk)
@@ -85,6 +86,9 @@ generateChunkBlocks :: proc(^thread.Thread) {
 
 		append(&world.genStack, work.chunkPosition)
 		for pos in world.genStack {
+			dist := work.chunkPosition - pos
+			if dist.x * dist.x + dist.y * dist.y + dist.z * dist.z >= 9*9 || world.history[pos] do continue
+
 			work2, newCenter := chan.try_recv(threadWork_chan)
 			hasHighPriority := chan.can_recv(highPriority_chan)
 			if newCenter do work = work2
@@ -96,16 +100,13 @@ generateChunkBlocks :: proc(^thread.Thread) {
 					generateChunk(pos)
 				}
 			}
-			sides := generateChunk(pos)
-			dist := work.chunkPosition - pos
-			if dist.x * dist.x + dist.y * dist.y + dist.z * dist.z < 9*9 {
-				if .Bottom in sides do append(&world.genStack, pos + {0, -1, 0})
-				if .Up in sides do append(&world.genStack, pos + {0, 1, 0})
-				if .South in sides do append(&world.genStack, pos + {0, 0, -1})
-				if .North in sides do append(&world.genStack, pos + {0, 0, 1})
-				if .West in sides do append(&world.genStack, pos + {-1, 0, 0})
-				if .East in sides do append(&world.genStack, pos + {1, 0, 0})
-			}
+			generateChunk(pos)
+			append(&world.genStack, pos + {-1, 0, 0})
+			append(&world.genStack, pos + { 1, 0, 0})
+			append(&world.genStack, pos + { 0,-1, 0})
+			append(&world.genStack, pos + { 0, 1, 0})
+			append(&world.genStack, pos + { 0, 0,-1})
+			append(&world.genStack, pos + { 0, 0, 1})
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
@@ -290,6 +291,9 @@ main :: proc() {
 						toLeft = true
 					case .D:
 						toRight = true
+					case .Q:
+						c := world.allChunks[playerCamera.chunk]
+						fmt.printfln("chunk pos: %d, %d, %d. level: %d", c.pos.x, c.pos.y, c.pos.z, c.level)
 				}
 			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
