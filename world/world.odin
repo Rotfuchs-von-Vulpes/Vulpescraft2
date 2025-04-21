@@ -126,7 +126,7 @@ history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
 calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
-    if chunk.level != .InternalLight do return
+    //if chunk.level != .InternalLight do return
     for i in -1..=1 {
         for j in -1..=1 {
             for k in -1..=1 {
@@ -167,20 +167,30 @@ genPoll :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
                 }
             }
         }
+        // for i in -1..=1 {
+        //     for k in -1..=1 {
+        //         for j := i32(1); j > -1; j -= 1 {
+        //             c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+        //             if c.isEmpty {
+        //                 //allLight(c)
+        //             } else {
+        //                 //sunlight(c)
+        //             }
+        //         }
+        //     }
+        // }
+        chunks: [3][3][3]^Chunk
         for i in -1..=1 {
-            for k in -1..=1 {
-                for j := i32(1); j > -1; j -= 1 {
+            for j in -1..=1 {
+                for k in -1..=1 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    if c.isEmpty {
-                        allLight(c)
-                    } else {
-                        sunlight(c)
-                    }
+                    chunks[i + 1][j + 1][k + 1] = c
                 }
             }
         }
         calcSides(chunk, tempMap)
-        iluminate(chunk)
+        applyLight(chunks)
+        //iluminate(chunk)
         chunk.level = .Final
     }
 
