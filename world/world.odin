@@ -125,13 +125,12 @@ sqDist :: proc(pos1, pos2: iVec3, dist: int) -> bool {
 history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
-calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
-    //if chunk.level != .InternalLight do return
+calcSides :: proc(chunks: [3][3][3]^Chunk) {
     for i in -1..=1 {
         for j in -1..=1 {
             for k in -1..=1 {
                 if i == 0 && j == 0 && k == 0 do continue
-                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), tempMap)
+                c := chunks[i + 1][j + 1][k + 1]
                 for x in 0..<16 {
                     if i == 1 && x != 0 do continue
                     if i == -1 && x != 15 do continue
@@ -144,7 +143,7 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
                             xx := i != 0 ? i < 0 ? 0 : 17 : x + 1
                             yy := j != 0 ? j < 0 ? 0 : 17 : y + 1
                             zz := k != 0 ? k < 0 ? 0 : 17 : z + 1
-                            chunk.primer[xx][yy][zz] = c.primer[x + 1][y + 1][z + 1]
+                            chunks[1][1][1].primer[xx][yy][zz] = c.primer[x + 1][y + 1][z + 1]
                         }
                     }
                 }
@@ -152,48 +151,40 @@ calcSides :: proc(chunk: ^Chunk, tempMap: ^map[iVec3]^Chunk) {
         }
     }
 
-    chunk.level = .SidesClone
+    chunks[1][1][1].level = .SidesClone
 }
 
-genPoll :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
-    if history[pos] do return nil
+genPoll :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> [3][3][3]^Chunk {
     chunk := eval(pos.x, pos.y, pos.z, tempMap)
+    chunks: [3][3][3]^Chunk
     if chunk.level != .Final {
-        for i in -2..=2 {
-            for j in -2..=2 {
-                for k in -2..=2 {
+        for i in -1..=1 {
+            for j in -1..=1 {
+                for k in -1..=1 {
                     c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
                     populate(c, tempMap)
                 }
             }
         }
-        // for i in -1..=1 {
-        //     for k in -1..=1 {
-        //         for j := i32(1); j > -1; j -= 1 {
-        //             c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-        //             if c.isEmpty {
-        //                 //allLight(c)
-        //             } else {
-        //                 //sunlight(c)
-        //             }
-        //         }
-        //     }
-        // }
-        chunks: [3][3][3]^Chunk
-        for i in -1..=1 {
-            for j in -1..=1 {
-                for k in -1..=1 {
-                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    chunks[i + 1][j + 1][k + 1] = c
-                }
-            }
-        }
-        calcSides(chunk, tempMap)
-        applyLight(chunks)
-        //iluminate(chunk)
         chunk.level = .Final
     }
 
+    for i in -1..=1 {
+        for j in -1..=1 {
+            for k in -1..=1 {
+                c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+                chunks[i + 1][j + 1][k + 1] = c
+            }
+        }
+    }
+
+    return chunks
+}
+
+addLights :: proc (chunks: [3][3][3]^Chunk) -> ^Chunk {
+    chunk := chunks[1][1][1]
+    calcSides(chunks)
+    applyLight(chunks)
     return chunk
 }
 

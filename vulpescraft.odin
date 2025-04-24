@@ -56,17 +56,14 @@ ThreadWork :: struct {
 
 threadWork_chan: chan.Chan(ThreadWork)
 chunks_chan: chan.Chan(^world.Chunk)
+chunks_light_chan: chan.Chan([3][3][3]^world.Chunk)
 highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
-generateChunk :: proc(pos: [3]i32) -> world.FaceSet {
-	chunk := world.genPoll(pos, &world.allChunks)
-	if chunk != nil && !world.history[chunk.pos] {
-		if !chunk.isEmpty do chan.send(chunks_chan, chunk)
-		world.history[chunk.pos] = true
-		return chunk.opened
-	}
-	return {}
+generateChunk :: proc(pos: [3]i32) {
+	chunks := world.genPoll(pos, &world.allChunks)
+	chan.send(chunks_light_chan, chunks)
+	world.history[chunks[1][1][1].pos] = true
 }
 
 generateChunkBlocks :: proc(^thread.Thread) {
@@ -100,15 +97,25 @@ generateChunkBlocks :: proc(^thread.Thread) {
 				}
 			}
 			generateChunk(pos)
-			append(&world.genStack, pos + {-1, 0, 0})
-			append(&world.genStack, pos + { 1, 0, 0})
-			append(&world.genStack, pos + { 0,-1, 0})
-			append(&world.genStack, pos + { 0, 1, 0})
-			append(&world.genStack, pos + { 0, 0,-1})
-			append(&world.genStack, pos + { 0, 0, 1})
+			if !world.history[pos + {-1, 0, 0}] do append(&world.genStack, pos + {-1, 0, 0})
+			if !world.history[pos + { 1, 0, 0}] do append(&world.genStack, pos + { 1, 0, 0})
+			if !world.history[pos + { 0,-1, 0}] do append(&world.genStack, pos + { 0,-1, 0})
+			if !world.history[pos + { 0, 1, 0}] do append(&world.genStack, pos + { 0, 1, 0})
+			if !world.history[pos + { 0, 0,-1}] do append(&world.genStack, pos + { 0, 0,-1})
+			if !world.history[pos + { 0, 0, 1}] do append(&world.genStack, pos + { 0, 0, 1})
 		}
 		clear_dynamic_array(&world.genStack)
 		clear_map(&world.history)
+	}
+}
+
+iluminateChunk :: proc (^thread.Thread) {
+	for !chan.is_closed(chunks_light_chan) {
+		for {
+			chunks, ok := chan.recv(chunks_light_chan)
+			if !ok do break
+			chan.send(chunks_chan, world.addLights(chunks))
+		}
 	}
 }
 
@@ -116,9 +123,7 @@ generateChunkMesh :: proc(^thread.Thread) {
 	for !chan.is_closed(chunks_chan) {
 		for {
 			chunk, ok := chan.recv(chunks_chan)
-			if !ok {
-				break
-			}
+			if !ok do break
 			chan.send(meshes_chan, worldRender.eval(chunk))
 		}
 	}
@@ -168,6 +173,7 @@ main :: proc() {
 	err: runtime.Allocator_Error
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
+	chunks_light_chan, err = chan.create_buffered(chan.Chan([3][3][3]^world.Chunk), 8 * 8, chunksAllocator)
 	threadWork_chan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
 	highPriority_chan, err = chan.create_buffered(chan.Chan([3]i32), 8 * 8, chunksAllocator)
 	
@@ -244,6 +250,8 @@ main :: proc() {
 	
 	chunkGenereatorThread := thread.create(generateChunkBlocks)
 	thread.start(chunkGenereatorThread)
+	chunkIluminatorThread := thread.create(iluminateChunk)
+	thread.start(chunkIluminatorThread)
 	meshGenereatorThread := thread.create(generateChunkMesh)
 	thread.start(meshGenereatorThread)
 	reloadChunks(false)
@@ -493,8 +501,10 @@ main :: proc() {
 	
 	chan.close(threadWork_chan)
 	chan.close(chunks_chan)
+	chan.close(chunks_light_chan)
 	chan.close(meshes_chan)
 	thread.destroy(chunkGenereatorThread)
+	thread.destroy(chunkIluminatorThread)
 	thread.destroy(meshGenereatorThread)
 	
 	prev_allocator := context.allocator
