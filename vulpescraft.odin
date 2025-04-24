@@ -250,16 +250,13 @@ main :: proc() {
 	
 	chunkGenereatorThread := thread.create(generateChunkBlocks)
 	thread.start(chunkGenereatorThread)
-	chunkIluminatorThread := thread.create(iluminateChunk)
-	thread.start(chunkIluminatorThread)
+	chunkIluminatorThreads: [4]^thread.Thread
+	for &t in chunkIluminatorThreads {
+		t = thread.create(iluminateChunk)
+		thread.start(t)
+	}
 	meshGenereatorThread := thread.create(generateChunkMesh)
 	thread.start(meshGenereatorThread)
-	chunkIluminatorThread2 := thread.create(iluminateChunk)
-	thread.start(chunkIluminatorThread2)
-	chunkIluminatorThread3 := thread.create(iluminateChunk)
-	thread.start(chunkIluminatorThread3)
-	chunkIluminatorThread4 := thread.create(iluminateChunk)
-	thread.start(chunkIluminatorThread4)
 	// meshGenereatorThread2 := thread.create(generateChunkMesh)
 	// thread.start(meshGenereatorThread2)
 	reloadChunks(false)
@@ -512,10 +509,7 @@ main :: proc() {
 	chan.close(chunks_light_chan)
 	chan.close(meshes_chan)
 	thread.destroy(chunkGenereatorThread)
-	thread.destroy(chunkIluminatorThread)
-	thread.destroy(chunkIluminatorThread2)
-	thread.destroy(chunkIluminatorThread3)
-	thread.destroy(chunkIluminatorThread4)
+	for &t in chunkIluminatorThreads do thread.destroy(t)
 	thread.destroy(meshGenereatorThread)
 	// thread.destroy(meshGenereatorThread2)
 	
