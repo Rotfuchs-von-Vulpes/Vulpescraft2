@@ -93,8 +93,6 @@ populate :: proc (chunks: [3][3][3]^Chunk) {
         
         rand.reset(u64(math.abs(x * 263781623 + y * 3647463 + z * z + 1)))
         n := int(math.floor(3 * rand.float32() + 3))
-
-        if x == 0 && y == 0 && z == 0 do fmt.printfln("%d", n)
             
         for _ in 0..<n {
             x0 := u32(math.floor(16 * rand.float32()))
