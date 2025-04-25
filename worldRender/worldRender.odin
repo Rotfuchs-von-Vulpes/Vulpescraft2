@@ -134,13 +134,18 @@ nuke :: proc() {
     delete(chunkMap)
 }
 
-destroy :: proc(chunks: [dynamic]^world.Chunk) {
+destroy_arr :: proc(chunks: []^world.Chunk) {
 	for chunk in chunks {
 		delete_key(&chunkMap, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
 		delete_key(&dataChunks, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
-
-		// #reverse for &c, idx in bufferedChunks {
-		// 	if c.pos == chunk.pos do c.toDelete = true
-		// }
 	}
 }
+
+destroy_mat :: proc(chunks: [3][3][3]^world.Chunk) {
+	for arr1 in chunks do for arr2 in arr1 do for chunk in arr2 {
+		delete_key(&chunkMap, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
+		delete_key(&dataChunks, iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z})
+	}
+}
+
+destroy :: proc {destroy_arr, destroy_mat}

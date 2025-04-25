@@ -128,49 +128,49 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
     return nil, pos, false
 }
 
-atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> [dynamic]^Chunk {
+atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> []^Chunk {
     chunks: [dynamic]^Chunk
+    defer delete(chunks)
 
-    for i in -1..=1 {
-        for j in -1..=1 {
-            for k in -1..=1 {
-                c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &allChunks)
-                c.level = .Trees
-                seeSides(c)
-                append(&chunks, c)
-            }
+    for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
+        c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &allChunks)
+        c.level = .Trees
+        seeSides(c)
+        ccs: [3][3][3]^Chunk
+        for ii in -1..=1 do for jj in -1..=1 do for kk in -1..=1 {
+            cc := eval(c.pos.x + i32(ii), c.pos.y + i32(jj), c.pos.z + i32(kk), &allChunks)
+            ccs[ii + 1][jj + 1][kk + 1] = cc
         }
+        calcSides(ccs)
+        isFilled(c)
+        append(&chunks, c)
     }
 
-    for &chunk in chunks {
-        history[chunk.pos] = false
-        chunk.remeshing = true
-    }
-
-    return chunks
+    return chunks[:]
 }
 
-destroy :: proc(origin, direction: vec3) -> ([dynamic]^Chunk, iVec3, bool) {
-    chunks: [dynamic]^Chunk
+destroy :: proc(origin, direction: vec3) -> ([]^Chunk, bool) {
+    chunks: []^Chunk
     chunk, pos, ok := raycast(origin, direction, false)
 
-    if !ok {return chunks, pos, false}
+    if !ok {return chunks, false}
     chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 0
+    chunk.isFill = false
 
     chunks = atualizeChunks(chunk, pos)
 
-    return chunks, pos, true
+    return chunks, true
 }
 
-place :: proc(origin, direction: vec3, block: u16) -> ([dynamic]^Chunk, iVec3, bool) {
-    chunks: [dynamic]^Chunk
+place :: proc(origin, direction: vec3, block: u16) -> ([]^Chunk, bool) {
+    chunks: []^Chunk
     chunk, pos, ok := raycast(origin, direction, true)
 
-    if !ok {return chunks, pos, false}
+    if !ok {return chunks, false}
     chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
     chunk.isEmpty = false
     
     chunks = atualizeChunks(chunk, pos)
 
-    return chunks, pos, true
+    return chunks, true
 }

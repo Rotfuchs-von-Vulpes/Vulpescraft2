@@ -30,33 +30,43 @@ Chunk :: struct {
     opened: FaceSet,
     level: GeneratePhase,
     isEmpty: bool,
+    isFill: bool,
     remeshing: bool,
 }
 
 allChunks := make(map[iVec3]^Chunk)
 
 getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
-    empty: blockState = {
-        id = 0,
-        light = {0, 0},
-    }
-
     chunk.level = .Empty
     chunk.opened = {}
     chunk.pos = {x, y, z}
     chunk.isEmpty = true
+    chunk.isFill = false
     chunk.remeshing = false
 }
 
 seeSides :: proc(chunk: ^Chunk) {
+    chunk.opened = {}
     for i in 0..<16 do for j in 0..<16 {
-        if chunk.primer[i + 1][j + 1][ 0].id == 0 do chunk.opened += {.South}
-        if chunk.primer[i + 1][j + 1][15].id == 0 do chunk.opened += {.North}
-        if chunk.primer[i + 1][ 0][j + 1].id == 0 do chunk.opened += {.Bottom}
-        if chunk.primer[i + 1][15][j + 1].id == 0 do chunk.opened += {.Up}
-        if chunk.primer[ 0][i + 1][j + 1].id == 0 do chunk.opened += {.West}
-        if chunk.primer[15][i + 1][j + 1].id == 0 do chunk.opened += {.East}
+        if chunk.primer[i + 1][j + 1][ 1].id == 0 do chunk.opened += {.South}
+        if chunk.primer[i + 1][j + 1][16].id == 0 do chunk.opened += {.North}
+        if chunk.primer[i + 1][ 1][j + 1].id == 0 do chunk.opened += {.Bottom}
+        if chunk.primer[i + 1][16][j + 1].id == 0 do chunk.opened += {.Up}
+        if chunk.primer[ 1][i + 1][j + 1].id == 0 do chunk.opened += {.West}
+        if chunk.primer[16][i + 1][j + 1].id == 0 do chunk.opened += {.East}
     }
+}
+
+isFilled :: proc(chunk: ^Chunk) {
+    for i in 0..<18 do for j in 0..<18 do for k in 0..<18 {
+        id := chunk.primer[i][j][k].id
+        if isPLaceable(id) {
+            chunk.isFill = false
+            return 
+        }
+    }
+
+    chunk.isFill = true
 }
 
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
@@ -140,43 +150,52 @@ calcSides :: proc(chunks: [3][3][3]^Chunk) {
                         for z in 0..<16 {
                             if k == 1 && z != 0 do continue
                             if k == -1 && z != 15 do continue
-                            xx := i != 0 ? i < 0 ? 0 : 17 : x + 1
-                            yy := j != 0 ? j < 0 ? 0 : 17 : y + 1
-                            zz := k != 0 ? k < 0 ? 0 : 17 : z + 1
-                            chunks[1][1][1].primer[xx][yy][zz] = c.primer[x + 1][y + 1][z + 1]
+                            x1 := i != 0 ? i < 0 ? 0 : 17 : x + 1
+                            y1 := j != 0 ? j < 0 ? 0 : 17 : y + 1
+                            z1 := k != 0 ? k < 0 ? 0 : 17 : z + 1
+                            chunks[1][1][1].primer[x1][y1][z1] = c.primer[x + 1][y + 1][z + 1]
                         }
                     }
                 }
             }
         }
     }
-
-    chunks[1][1][1].level = .SidesClone
 }
 
-genPoll :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> [3][3][3]^Chunk {
-    chunk := eval(pos.x, pos.y, pos.z, tempMap)
+genPoll :: proc(chunk: ^Chunk) -> [3][3][3]^Chunk {
+    // chunk := eval(pos.x, pos.y, pos.z, tempMap)
     chunks: [3][3][3]^Chunk
-    if chunk.level != .Final {
+    if chunk.level == .Empty {
         for i in -1..=1 {
             for j in -1..=1 {
                 for k in -1..=1 {
-                    c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                    populate(c, tempMap)
+                    c: ^Chunk
+                    if i == 0 && j == 0 && k == 0 {
+                        c = chunk
+                        setBlocksChunk(c, terrain.getHeightMap(chunk.pos.x, chunk.pos.z))
+                    } else {
+                        c = new(Chunk)
+                        getNewChunk(c, chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k))
+                        setBlocksChunk(c, terrain.getHeightMap(chunk.pos.x + i32(i), chunk.pos.z + i32(k)))
+                    }
+                    chunks[i + 1][j + 1][k + 1] = c
                 }
             }
         }
-        chunk.level = .Final
+        populate(chunks)
+        calcSides(chunks)
+        isFilled(chunk)
+        chunk.level = .Trees
     }
 
-    for i in -1..=1 {
-        for j in -1..=1 {
-            for k in -1..=1 {
-                c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-                chunks[i + 1][j + 1][k + 1] = c
-            }
-        }
-    }
+    // for i in -1..=1 {
+    //     for j in -1..=1 {
+    //         for k in -1..=1 {
+    //             c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
+    //             chunks[i + 1][j + 1][k + 1] = c
+    //         }
+    //     }
+    // }
 
     return chunks
 }
@@ -185,9 +204,16 @@ addLights :: proc (chunks: [3][3][3]^Chunk) -> ^Chunk {
     chunk := chunks[1][1][1]
     calcSides(chunks)
     applyLight(chunks)
+    // for i in 0..=2 do for j in 0..=2 do for k in 0..=2 {
+    //     if i != 1 || j != 1 || k != 1 {
+    //         free(chunks[i][j][k])
+    //     }
+    // }
+    chunk.level = .Final
     return chunk
 }
 
 nuke :: proc() {
+    for _, &chunk in allChunks do free(chunk)
     delete(allChunks)
 }

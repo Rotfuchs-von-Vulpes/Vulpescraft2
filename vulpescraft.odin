@@ -6,6 +6,7 @@ import "core:time"
 import "core:mem"
 import "core:thread"
 import "core:sync/chan"
+import "core:slice"
 import math "core:math/linalg"
 import glm "core:math/linalg/glsl"
 import "skeewb"
@@ -55,58 +56,42 @@ ThreadWork :: struct {
 }
 
 threadWork_chan: chan.Chan(ThreadWork)
+pos_chan: chan.Chan([3]i32)
+pointer_chan: chan.Chan(^world.Chunk)
 chunks_chan: chan.Chan(^world.Chunk)
 chunks_light_chan: chan.Chan([3][3][3]^world.Chunk)
-highPriority_chan: chan.Chan([3]i32)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
-generateChunk :: proc(pos: [3]i32) {
-	chunks := world.genPoll(pos, &world.allChunks)
-	chan.send(chunks_light_chan, chunks)
-	world.history[chunks[1][1][1].pos] = true
+generateChunk :: proc(chunk: ^world.Chunk) {
+	chunks := world.genPoll(chunk)
+	if !chunk.isEmpty && !chunk.isFill do chan.send(chunks_light_chan, chunks)
 }
 
 generateChunkBlocks :: proc(^thread.Thread) {
-	work: ThreadWork
-	for !chan.is_closed(threadWork_chan) {
-		if chan.can_recv(highPriority_chan) {
-			for {
-				pos, ok := chan.try_recv(highPriority_chan)
-				if !ok do break
-				world.history[pos] = false
-				generateChunk(pos)
-			}
-		}
-
-		work, _ = chan.recv(threadWork_chan)
-
-		append(&world.genStack, work.chunkPosition)
-		for pos in world.genStack {
-			dist := work.chunkPosition - pos
-			if dist.x * dist.x + dist.y * dist.y + dist.z * dist.z >= 9*9 || world.history[pos] do continue
-
-			work2, newCenter := chan.try_recv(threadWork_chan)
-			hasHighPriority := chan.can_recv(highPriority_chan)
-			if newCenter do work = work2
-			if hasHighPriority {
-				for {
-					pos, ok := chan.try_recv(highPriority_chan)
-					if !ok do break
-					world.history[pos] = false
-					generateChunk(pos)
-				}
-			}
-			generateChunk(pos)
-			if !world.history[pos + {-1, 0, 0}] do append(&world.genStack, pos + {-1, 0, 0})
-			if !world.history[pos + { 1, 0, 0}] do append(&world.genStack, pos + { 1, 0, 0})
-			if !world.history[pos + { 0,-1, 0}] do append(&world.genStack, pos + { 0,-1, 0})
-			if !world.history[pos + { 0, 1, 0}] do append(&world.genStack, pos + { 0, 1, 0})
-			if !world.history[pos + { 0, 0,-1}] do append(&world.genStack, pos + { 0, 0,-1})
-			if !world.history[pos + { 0, 0, 1}] do append(&world.genStack, pos + { 0, 0, 1})
-		}
-		clear_dynamic_array(&world.genStack)
-		clear_map(&world.history)
+	for !chan.is_closed(pointer_chan) {
+		chunk, ok := chan.recv(pointer_chan)
+		if !ok do continue
+		generateChunk(chunk)
 	}
+}
+
+getChunkPointerThread :: proc (^thread.Thread) {
+	context.allocator = runtime.default_allocator()
+
+	for !chan.is_closed(pos_chan) {
+		for {
+			pos, ok := chan.recv(pos_chan)
+			if !ok do break
+			chunk, first, _ := util.map_force_get(&world.allChunks, pos)
+			if first {
+				chunk ^= new(world.Chunk)
+				world.getNewChunk(chunk^, pos.x, pos.y, pos.z)
+				chan.send(pointer_chan, chunk^)
+			}
+		}
+	}
+
+	world.nuke()
 }
 
 iluminateChunk :: proc (^thread.Thread) {
@@ -131,10 +116,15 @@ generateChunkMesh :: proc(^thread.Thread) {
 
 toReload := false
 
+history := make(map[[3]i32]bool)
+
+less_dist :: proc (a, b: [3]i32) -> bool {
+	return a.x*a.x + a.y*a.y + a.z*a.z < b.x*b.x + b.y*b.y + b.z*b.z
+}
+
 reloadChunks :: proc(reset: bool) {
 	toReload = false
 
-	clear_map(&world.history)
 	buffer := [dynamic]int{}
 	defer delete(buffer)
 	for chunk, idx in allChunks {
@@ -149,6 +139,29 @@ reloadChunks :: proc(reset: bool) {
 	chan.send(threadWork_chan, ThreadWork {
 		chunkPosition = playerCamera.chunk,
 	})
+
+	viewDist := world.VIEW_DISTANCE
+	viewSize := 2 * viewDist + 1
+	positions := [dynamic][3]i32{}
+	defer delete(positions)
+
+	for x in 0..<viewSize do for y in 0..<viewSize do for z in 0..<viewSize {
+		xx := x - viewDist
+		yy := y - viewDist
+		zz := z - viewDist
+
+		append(&positions, [3]i32{i32(xx), i32(yy), i32(zz)})
+	}
+
+	positionsList := positions[:]
+	slice.sort_by(positionsList, less_dist)
+
+	for pos in positionsList {
+		if pos.x*pos.x + pos.y*pos.y + pos.z*pos.z >= world.VIEW_DISTANCE * world.VIEW_DISTANCE do break
+		p := pos + playerCamera.chunk
+		if !history[p] do chan.send(pos_chan, p)
+		history[p] = true
+	}
 }
 
 yaw: f32 = -90.0;
@@ -169,13 +182,16 @@ main :: proc() {
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 
+	// tracy.Zone()
+
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
+	pos_chan, err = chan.create_buffered(chan.Chan([3]i32), 2000000, chunksAllocator)
+	pointer_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	chunks_light_chan, err = chan.create_buffered(chan.Chan([3][3][3]^world.Chunk), 8 * 8, chunksAllocator)
 	threadWork_chan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
-	highPriority_chan, err = chan.create_buffered(chan.Chan([3]i32), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -248,17 +264,21 @@ main :: proc() {
 	toLeft := false
 	toDebug := false
 	
-	chunkGenereatorThread := thread.create(generateChunkBlocks)
-	thread.start(chunkGenereatorThread)
-	chunkIluminatorThreads: [4]^thread.Thread
+	chunkInitializatorThreads: [6]^thread.Thread
+	chunkInitializatorThread := thread.create(getChunkPointerThread)
+	thread.start(chunkInitializatorThread)
+	chunkGenereatorThreads: [6]^thread.Thread
+	for &t in chunkGenereatorThreads {
+		t = thread.create(generateChunkBlocks)
+		thread.start(t)
+	}
+	chunkIluminatorThreads: [6]^thread.Thread
 	for &t in chunkIluminatorThreads {
 		t = thread.create(iluminateChunk)
 		thread.start(t)
 	}
 	meshGenereatorThread := thread.create(generateChunkMesh)
 	thread.start(meshGenereatorThread)
-	// meshGenereatorThread2 := thread.create(generateChunkMesh)
-	// thread.start(meshGenereatorThread2)
 	reloadChunks(false)
 
 	looking := true
@@ -303,9 +323,17 @@ main :: proc() {
 						toLeft = true
 					case .D:
 						toRight = true
-					// case .Q:
-					// 	c := world.allChunks[playerCamera.chunk]
-					// 	fmt.printfln("chunk pos: %d, %d, %d. level: %d", c.pos.x, c.pos.y, c.pos.z, c.level)
+					case .Q:
+						c := world.allChunks[playerCamera.chunk]
+						oponed := c.opened
+						str := "Opened sides: "
+						if .Up in oponed do str = fmt.tprintf("%s, Up", str)
+						if .Bottom in oponed do str = fmt.tprintf("%s, Bottom", str)
+						if .North in oponed do str = fmt.tprintf("%s, North", str)
+						if .South in oponed do str = fmt.tprintf("%s, South", str)
+						if .West in oponed do str = fmt.tprintf("%s, West", str)
+						if .East in oponed do str = fmt.tprintf("%s, East", str)
+						fmt.printfln(str)
 				}
 			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
@@ -358,25 +386,33 @@ main :: proc() {
 				}
 			} else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
-					chunksToDelete, pos, ok := world.destroy(playerCamera.pos, playerCamera.front)
-					defer delete(chunksToDelete)
-					if ok {
-						worldRender.destroy(chunksToDelete)
-						for chunk in chunksToDelete {
-							chan.send(highPriority_chan, chunk.pos)
-							append(&toRemashing, chunk.pos)
+					chunksToUpdate, ok := world.destroy(playerCamera.pos, playerCamera.front)
+					for chunk in chunksToUpdate {
+						if chunk.isEmpty || chunk.isFill do continue
+						chunks: [3][3][3]^world.Chunk
+						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
+							c := world.eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &world.allChunks)
+							chunks[i + 1][j + 1][k + 1] = c
 						}
+						chan.send(chunks_light_chan, chunks)
+					}
+					if ok {
+						worldRender.destroy(chunksToUpdate)
 						reloadChunks(true)
 					}
 				} else if event.button.button == 3 {
-					chunksToDelete, pos, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1)
-					defer delete(chunksToDelete)
-					if ok {
-						worldRender.destroy(chunksToDelete)
-						for chunk in chunksToDelete {
-							chan.send(highPriority_chan, chunk.pos)
-							append(&toRemashing, chunk.pos)
+					chunksToUpdate, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1)
+					for chunk in chunksToUpdate {
+						if chunk.isEmpty || chunk.isFill do continue
+						chunks: [3][3][3]^world.Chunk
+						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
+							c := world.eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &world.allChunks)
+							chunks[i + 1][j + 1][k + 1] = c
 						}
+						chan.send(chunks_light_chan, chunks)
+					}
+					if ok {
+						worldRender.destroy(chunksToUpdate)
 						reloadChunks(true)
 					}
 				}
@@ -448,9 +484,7 @@ main :: proc() {
 			done := false
 			for {
 				chunk, ok := chan.try_recv(meshes_chan)
-				if !ok {
-					break
-				}
+				if !ok do break
 				done = true
 				for chunk2, idx in allChunks {
 					if chunk.pos == chunk2.pos {
@@ -500,28 +534,27 @@ main :: proc() {
 			fps = nbFrames
 			nbFrames = 0
 			lastTimeTicks = time.tick_now()
+			// fmt.printfln("%d", chan.len(pos_chan))
 		}
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
 	}
 	
+	chan.close(pos_chan)
+	chan.close(pointer_chan)
 	chan.close(threadWork_chan)
 	chan.close(chunks_chan)
 	chan.close(chunks_light_chan)
 	chan.close(meshes_chan)
-	thread.destroy(chunkGenereatorThread)
+	thread.destroy(chunkInitializatorThread)
+	//for &t in chunkInitializatorThreads do thread.destroy(t)
+	for &t in chunkGenereatorThreads do thread.destroy(t)
 	for &t in chunkIluminatorThreads do thread.destroy(t)
 	thread.destroy(meshGenereatorThread)
 	// thread.destroy(meshGenereatorThread2)
 	
-	prev_allocator := context.allocator
-	context.allocator = mem.tracking_allocator(tracking_allocator)
-
-	defer context.allocator = prev_allocator
-	defer mem.tracking_allocator_destroy(tracking_allocator)
-	
 	hud.nuke()
 	worldRender.nuke()
-	world.nuke()
+	// world.nuke()
 	frameBuffer.nuke()
 
 	for key, value in blockRender.uniforms {
@@ -550,12 +583,19 @@ main :: proc() {
 	gl.DeleteProgram(sunRender.program)
 	gl.DeleteProgram(debugRender.program)
 	delete(toRemashing)
+	delete(history)
 	delete(allChunks)
 	delete(chunks)
 	
 	sdl2.GL_DeleteContext(gl_context)
 	sdl2.DestroyWindow(window)
 	sdl2.Quit()
+
+	prev_allocator := context.allocator
+	context.allocator = mem.tracking_allocator(tracking_allocator)
+
+	defer context.allocator = prev_allocator
+	defer mem.tracking_allocator_destroy(tracking_allocator)
 	
 	temp := runtime.default_temp_allocator_temp_begin()
 	defer runtime.default_temp_allocator_temp_end(temp)
