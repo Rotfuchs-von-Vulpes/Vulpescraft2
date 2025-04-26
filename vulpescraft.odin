@@ -57,7 +57,6 @@ ThreadWork :: struct {
 
 threadWork_chan: chan.Chan(ThreadWork)
 pos_chan: chan.Chan([3]i32)
-pointer_chan: chan.Chan(^world.Chunk)
 chunks_chan: chan.Chan(^world.Chunk)
 chunks_light_chan: chan.Chan([3][3][3]^world.Chunk)
 meshes_chan: chan.Chan(mesh.ChunkData)
@@ -68,29 +67,17 @@ generateChunk :: proc(chunk: ^world.Chunk) {
 }
 
 generateChunkBlocks :: proc(^thread.Thread) {
-	for !chan.is_closed(pointer_chan) {
-		chunk, ok := chan.recv(pointer_chan)
-		if !ok do continue
-		generateChunk(chunk)
-	}
-}
-
-getChunkPointerThread :: proc (^thread.Thread) {
 	context.allocator = runtime.default_allocator()
-
 	for !chan.is_closed(pos_chan) {
-		for {
-			pos, ok := chan.recv(pos_chan)
-			if !ok do break
-			chunk, first, _ := util.map_force_get(&world.allChunks, pos)
-			if first {
-				chunk ^= new(world.Chunk)
-				world.getNewChunk(chunk^, pos.x, pos.y, pos.z)
-				chan.send(pointer_chan, chunk^)
-			}
+		pos, ok := chan.recv(pos_chan)
+		if !ok do continue
+		chunk, first, _ := util.map_force_get(&world.allChunks, pos)
+		if first {
+			chunk ^= new(world.Chunk)
+			world.getNewChunk(chunk^, pos.x, pos.y, pos.z)
 		}
+		generateChunk(chunk^)
 	}
-
 	world.nuke()
 }
 
@@ -105,6 +92,8 @@ iluminateChunk :: proc (^thread.Thread) {
 }
 
 generateChunkMesh :: proc(^thread.Thread) {
+	context.allocator = runtime.default_allocator()
+
 	for !chan.is_closed(chunks_chan) {
 		for {
 			chunk, ok := chan.recv(chunks_chan)
@@ -112,6 +101,8 @@ generateChunkMesh :: proc(^thread.Thread) {
 			chan.send(meshes_chan, worldRender.eval(chunk))
 		}
 	}
+
+	world.nuke()
 }
 
 toReload := false
@@ -187,7 +178,6 @@ main :: proc() {
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
 	pos_chan, err = chan.create_buffered(chan.Chan([3]i32), 2000000, chunksAllocator)
-	pointer_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	chunks_light_chan, err = chan.create_buffered(chan.Chan([3][3][3]^world.Chunk), 8 * 8, chunksAllocator)
@@ -264,9 +254,8 @@ main :: proc() {
 	toLeft := false
 	toDebug := false
 	
-	chunkInitializatorThreads: [6]^thread.Thread
-	chunkInitializatorThread := thread.create(getChunkPointerThread)
-	thread.start(chunkInitializatorThread)
+	// chunkInitializatorThread := thread.create(getChunkPointerThread)
+	// thread.start(chunkInitializatorThread)
 	chunkGenereatorThreads: [6]^thread.Thread
 	for &t in chunkGenereatorThreads {
 		t = thread.create(generateChunkBlocks)
@@ -540,21 +529,16 @@ main :: proc() {
 	}
 	
 	chan.close(pos_chan)
-	chan.close(pointer_chan)
 	chan.close(threadWork_chan)
 	chan.close(chunks_chan)
 	chan.close(chunks_light_chan)
 	chan.close(meshes_chan)
-	thread.destroy(chunkInitializatorThread)
-	//for &t in chunkInitializatorThreads do thread.destroy(t)
 	for &t in chunkGenereatorThreads do thread.destroy(t)
 	for &t in chunkIluminatorThreads do thread.destroy(t)
 	thread.destroy(meshGenereatorThread)
-	// thread.destroy(meshGenereatorThread2)
 	
 	hud.nuke()
 	worldRender.nuke()
-	// world.nuke()
 	frameBuffer.nuke()
 
 	for key, value in blockRender.uniforms {
