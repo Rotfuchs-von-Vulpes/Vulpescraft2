@@ -78,7 +78,6 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		}
 		generateChunk(chunk^)
 	}
-	world.nuke()
 }
 
 iluminateChunk :: proc (^thread.Thread) {
@@ -538,6 +537,7 @@ main :: proc() {
 	thread.destroy(meshGenereatorThread)
 	
 	hud.nuke()
+	//world.nuke()
 	worldRender.nuke()
 	frameBuffer.nuke()
 
