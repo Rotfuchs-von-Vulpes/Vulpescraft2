@@ -100,8 +100,6 @@ generateChunkMesh :: proc(^thread.Thread) {
 			chan.send(meshes_chan, worldRender.eval(chunk))
 		}
 	}
-
-	world.nuke()
 }
 
 toReload := false
