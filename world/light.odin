@@ -8,7 +8,7 @@ Light :: struct{
     value: u8,
 }
 
-applyLight :: proc (chunks: [3][3][3]^Chunk) {
+applyLight :: proc (chunk: ^Chunk) {
     emissiveCache := [dynamic]Light{}
     defer delete(emissiveCache)
     sunlightCache := [dynamic]Light{}
@@ -16,37 +16,27 @@ applyLight :: proc (chunks: [3][3][3]^Chunk) {
 
     lightCopy: [3 * 16][3 * 16][3 * 16][2]u8
     visited: [3 * 16][3 * 16][3 * 16][2]bool
+
     for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-        chunk := chunks[i + 1][j + 1][k + 1]
-        for x in 0..<16 do for z in 0..<16 {
-            foundGround := false
-            for y := 15; y >= 0; y -= 1 {
-                if i == 0 && j == 0 && k == 0 do chunk.primer[x + 1][y + 1][z + 1].light = {0, 0}
-                block := chunk.primer[x + 1][y + 1][z + 1]
-                id := block.id
-                transparent := id == 7 || id == 8 || id == 9
-                solid := id != 0 && !transparent
-
-                pos := [3]int{x + i * 16 + 16, y + j * 16 + 16, z + k * 16 + 16}
+        for x in 0..<16 do for y in 0..<16 do for z in 0..<16 {
+            data := chunk.lightData[(i + 1) * 16 + x][(j + 1) * 16 + y][(k + 1) * 16 + z]
+            pos := iVec3{i32((i + 1) * 16 + x), i32((j + 1) * 16 + y), i32((k + 1) * 16 + z)}
                 
-                visited[pos.x][pos.y][pos.z] = {solid, solid}
-                lightCopy[pos.x][pos.y][pos.z] = {0, 0}
+            visited[pos.x][pos.y][pos.z] = {data.solid, data.solid}
+            lightCopy[pos.x][pos.y][pos.z] = {0, 0}
 
-                if id != 0 {
-                    foundGround = true
-                }
+            //if data.solid do continue
 
-                if id == 9 {
-                    light := Light{{i32(x + i * 16) + 16, i32(y + j * 16) + 16, i32(z + k * 16) + 16}, 15}
-                    append(&emissiveCache, light)
-                    visited[pos.x][pos.y][pos.z].x = true
-                }
+            if data.light {
+                light := Light{pos, 15}
+                append(&emissiveCache, light)
+                visited[pos.x][pos.y][pos.z].x = true
+            }
 
-                if !foundGround {
-                    light := Light{{i32(x + i * 16) + 16, i32(y + j * 16) + 16, i32(z + k * 16) + 16}, 15}
-                    append(&sunlightCache, light)
-                    visited[pos.x][pos.y][pos.z].y = true
-                }
+            if data.sky {
+                light := Light{pos, 15}
+                append(&sunlightCache, light)
+                visited[pos.x][pos.y][pos.z].y = true
             }
         }
     }
@@ -123,10 +113,9 @@ applyLight :: proc (chunks: [3][3][3]^Chunk) {
         }
     }
 
-    chunk := chunks[1][1][1]
     for x in -1..<17 do for y in -1..<17 do for z in -1..<17 {
         chunk.primer[x + 1][y + 1][z + 1].light = lightCopy[x + 16][y + 16][z + 16]
     }
 
-    chunks[1][1][1].level = .ExternalLight
+    chunk.level = .ExternalLight
 }

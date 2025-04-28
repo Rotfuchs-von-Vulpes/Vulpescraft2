@@ -55,49 +55,38 @@ ThreadWork :: struct {
 	reset: bool,
 }
 
-pos_chan: chan.Chan([3]i32)
+pos_chan: chan.Chan(^world.Chunk)
 chunks_chan: chan.Chan(^world.Chunk)
-chunks_light_chan: chan.Chan([3][3][3]^world.Chunk)
+chunks_light_chan: chan.Chan(^world.Chunk)
 meshes_chan: chan.Chan(mesh.ChunkData)
 
 generateChunk :: proc(chunk: ^world.Chunk) {
-	chunks := world.genPoll(chunk)
-	if !chunk.isEmpty && !chunk.isFill do chan.send(chunks_light_chan, chunks)
+	world.genPoll(chunk)
+	if !chunk.isEmpty && !chunk.isFill do chan.send(chunks_light_chan, chunk)
 }
 
 generateChunkBlocks :: proc(^thread.Thread) {
-	context.allocator = runtime.default_allocator()
 	for !chan.is_closed(pos_chan) {
-		pos, ok := chan.recv(pos_chan)
+		chunk, ok := chan.recv(pos_chan)
 		if !ok do continue
-		chunk, first, _ := util.map_force_get(&world.allChunks, pos)
-		if first {
-			chunk ^= new(world.Chunk)
-			world.getNewChunk(chunk^, pos)
-		}
-		generateChunk(chunk^)
+		generateChunk(chunk)
 	}
 }
 
 iluminateChunk :: proc (^thread.Thread) {
 	for !chan.is_closed(chunks_light_chan) {
-		for {
-			chunks, ok := chan.recv(chunks_light_chan)
-			if !ok do break
-			chan.send(chunks_chan, world.addLights(chunks))
-		}
+		chunk, ok := chan.recv(chunks_light_chan)
+		if !ok do continue 
+		world.addLights(chunk)
+		chan.send(chunks_chan, chunk)
 	}
 }
 
 generateChunkMesh :: proc(^thread.Thread) {
-	context.allocator = runtime.default_allocator()
-
 	for !chan.is_closed(chunks_chan) {
-		for {
-			chunk, ok := chan.recv(chunks_chan)
-			if !ok do break
-			chan.send(meshes_chan, worldRender.eval(chunk))
-		}
+		chunk, ok := chan.recv(chunks_chan)
+		if !ok do continue 
+		chan.send(meshes_chan, worldRender.eval(chunk))
 	}
 }
 
@@ -142,7 +131,12 @@ reloadChunks :: proc(reset: bool) {
 	for pos in positionsList {
 		if pos.x*pos.x + pos.y*pos.y + pos.z*pos.z >= world.VIEW_DISTANCE * world.VIEW_DISTANCE do break
 		p := pos + playerCamera.chunk
-		if !history[p] do chan.send(pos_chan, p)
+		if !history[p] {
+			chunk := new(world.Chunk)
+			world.getNewChunk(chunk, p)
+			world.allChunks[p] = chunk
+			chan.send(pos_chan, chunk)
+		}
 		history[p] = true
 	}
 }
@@ -169,10 +163,10 @@ main :: proc() {
 
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error
-	pos_chan, err = chan.create_buffered(chan.Chan([3]i32), 2000000, chunksAllocator)
+	pos_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 2000000, chunksAllocator)
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
-	chunks_light_chan, err = chan.create_buffered(chan.Chan([3][3][3]^world.Chunk), 8 * 8, chunksAllocator)
+	chunks_light_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -314,6 +308,7 @@ main :: proc() {
 						if .West in oponed do str = fmt.tprintf("%s, West", str)
 						if .East in oponed do str = fmt.tprintf("%s, East", str)
 						fmt.printfln(str)
+						fmt.printfln("%d", c.level)
 				}
 			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
@@ -369,12 +364,7 @@ main :: proc() {
 					chunksToUpdate, ok := world.destroy(playerCamera.pos, playerCamera.front)
 					for chunk in chunksToUpdate {
 						if chunk.isEmpty || chunk.isFill do continue
-						chunks: [3][3][3]^world.Chunk
-						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-							c := world.eval(chunk.pos, &world.allChunks)
-							chunks[i + 1][j + 1][k + 1] = c
-						}
-						chan.send(chunks_light_chan, chunks)
+						chan.send(chunks_light_chan, chunk)
 					}
 					if ok {
 						worldRender.destroy(chunksToUpdate)
@@ -384,12 +374,7 @@ main :: proc() {
 					chunksToUpdate, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1)
 					for chunk in chunksToUpdate {
 						if chunk.isEmpty || chunk.isFill do continue
-						chunks: [3][3][3]^world.Chunk
-						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-							c := world.eval(chunk.pos, &world.allChunks)
-							chunks[i + 1][j + 1][k + 1] = c
-						}
-						chan.send(chunks_light_chan, chunks)
+						chan.send(chunks_light_chan, chunk)
 					}
 					if ok {
 						worldRender.destroy(chunksToUpdate)
@@ -528,7 +513,7 @@ main :: proc() {
 	thread.destroy(meshGenereatorThread)
 	
 	hud.nuke()
-	//world.nuke()
+	world.nuke()
 	worldRender.nuke()
 	frameBuffer.nuke()
 

@@ -132,19 +132,23 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> []^Chunk {
     chunks: [dynamic]^Chunk
     defer delete(chunks)
 
+    cs: [3][3][3]^Chunk
     for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-        c := eval(chunk.pos + {i32(i), i32(j), i32(k)}, &allChunks)
-        c.level = .Trees
-        seeSides(c)
+        c := allChunks[chunk.pos + {i32(i), i32(j), i32(k)}]
+        cs[i + 1][j + 1][k + 1] = c
+        if c != nil && (c.pos == chunk.pos || c.level == .Final) {
+            append(&chunks, c)
+        }
         ccs: [3][3][3]^Chunk
         for ii in -1..=1 do for jj in -1..=1 do for kk in -1..=1 {
-            cc := eval(c.pos + {i32(ii), i32(jj), i32(kk)}, &allChunks)
+            cc := allChunks[c.pos + {i32(ii), i32(jj), i32(kk)}]
             ccs[ii + 1][jj + 1][kk + 1] = cc
         }
         calcSides(ccs)
-        isFilled(c)
-        append(&chunks, c)
     }
+    seeSides(chunk)
+    calcSides(cs)
+    isFilled(chunk)
 
     return chunks[:]
 }

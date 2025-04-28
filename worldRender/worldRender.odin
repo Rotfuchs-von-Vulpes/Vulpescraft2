@@ -55,11 +55,9 @@ setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
 }
 
 eval :: proc(chunk: ^world.Chunk) -> mesh.ChunkData {
-    pos := iVec3{chunk.pos.x, chunk.pos.y, chunk.pos.z}
-    chunkBuffer, ok, _ := util.map_force_get(&dataChunks, pos)
-    if ok || chunk.remeshing {
+    chunkBuffer, ok, _ := util.map_force_get(&dataChunks, chunk.pos)
+    if ok {
         chunkBuffer^ = mesh.generateMesh(chunk)
-		// chunk.remeshing = false
     }
     return chunkBuffer^
 }

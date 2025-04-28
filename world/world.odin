@@ -19,20 +19,28 @@ blockState :: struct {
 }
 Primer :: [18][18][18]blockState
 
-Direction :: enum {Up, Bottom, North, South, East, West}
-FaceSet :: bit_set[Direction]
-
-
-GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, SidesClone, ExternalLight, Final}
+LightData :: struct {
+    light: bool,
+    solid: bool,
+    sky: bool,
+    fused: bool,
+}
+LightPrimer :: [3 * 16][3 * 16][3 * 16]LightData
 Chunk :: struct {
     pos: iVec3,
     primer: Primer,
+    lightData: LightPrimer,
     opened: FaceSet,
     level: GeneratePhase,
     isEmpty: bool,
     isFill: bool,
     remeshing: bool,
 }
+
+Direction :: enum {Up, Bottom, North, South, East, West}
+FaceSet :: bit_set[Direction]
+
+GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, SidesClone, ExternalLight, Final}
 
 allChunks := make(map[iVec3]^Chunk)
 
@@ -135,33 +143,61 @@ history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
 calcSides :: proc(chunks: [3][3][3]^Chunk) {
-    for i in -1..=1 {
-        for j in -1..=1 {
-            for k in -1..=1 {
-                if i == 0 && j == 0 && k == 0 do continue
-                c := chunks[i + 1][j + 1][k + 1]
-                for x in 0..<16 {
-                    if i == 1 && x != 0 do continue
-                    if i == -1 && x != 15 do continue
-                    for y in 0..<16 {
-                        if j == 1 && y != 0 do continue
-                        if j == -1 && y != 15 do continue
-                        for z in 0..<16 {
-                            if k == 1 && z != 0 do continue
-                            if k == -1 && z != 15 do continue
-                            x1 := i != 0 ? i < 0 ? 0 : 17 : x + 1
-                            y1 := j != 0 ? j < 0 ? 0 : 17 : y + 1
-                            z1 := k != 0 ? k < 0 ? 0 : 17 : z + 1
-                            chunks[1][1][1].primer[x1][y1][z1] = c.primer[x + 1][y + 1][z + 1]
-                        }
-                    }
+    chunk := chunks[1][1][1]
+
+    for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
+        c := chunks[i + 1][j + 1][k + 1]
+
+        if i != 0 || j != 0 || k != 0 do for x in 0..<16 {
+            if i == 1 && x != 0 do continue
+            if i == -1 && x != 15 do continue
+            for y in 0..<16 {
+                if j == 1 && y != 0 do continue
+                if j == -1 && y != 15 do continue
+                for z in 0..<16 {
+                    if k == 1 && z != 0 do continue
+                    if k == -1 && z != 15 do continue
+                    x1 := i != 0 ? i < 0 ? 0 : 17 : x + 1
+                    y1 := j != 0 ? j < 0 ? 0 : 17 : y + 1
+                    z1 := k != 0 ? k < 0 ? 0 : 17 : z + 1
+                    x2 := i != 0 ? i < 0 ? 17 : 0 : x + 1
+                    y2 := j != 0 ? j < 0 ? 17 : 0 : y + 1
+                    z2 := k != 0 ? k < 0 ? 17 : 0 : z + 1
+                    if c != nil {
+                        chunk.primer[x1][y1][z1] = c.primer[x + 1][y + 1][z + 1]
+                    } else do continue
                 }
+            }
+        }
+
+        for x in 0..<16 do for z in 0..<16 {
+            foundGround := false
+            for y := 15; y > 0; y -= 1 {
+                final := LightData{false, false, false, false}
+                id: u16
+                if c != nil {
+                    id = c.primer[x + 1][y + 1][z + 1].id
+                } else do continue
+
+                if id == 0 && !foundGround {
+                    final.sky = true
+                } else {
+                    foundGround = true
+                }
+
+                if id != 0 {
+                    final.solid = true
+                    if id == 9 do final.light = true
+                    if id == 7 || id == 8 do final.fused = true
+                }
+
+                chunk.lightData[(i + 1) * 16 + x][(j + 1) * 16 + y][(k + 1) * 16 + z] = final
             }
         }
     }
 }
 
-genPoll :: proc(chunk: ^Chunk) -> [3][3][3]^Chunk {
+genPoll :: proc(chunk: ^Chunk) {
     // chunk := eval(pos.x, pos.y, pos.z, tempMap)
     chunks: [3][3][3]^Chunk
     if chunk.level == .Empty {
@@ -186,30 +222,13 @@ genPoll :: proc(chunk: ^Chunk) -> [3][3][3]^Chunk {
         isFilled(chunk)
         chunk.level = .Trees
     }
-
-    // for i in -1..=1 {
-    //     for j in -1..=1 {
-    //         for k in -1..=1 {
-    //             c := eval(pos.x + i32(i), pos.y + i32(j), pos.z + i32(k), tempMap)
-    //             chunks[i + 1][j + 1][k + 1] = c
-    //         }
-    //     }
-    // }
-
-    return chunks
 }
 
-addLights :: proc (chunks: [3][3][3]^Chunk) -> ^Chunk {
-    chunk := chunks[1][1][1]
-    calcSides(chunks)
-    applyLight(chunks)
-    // for i in 0..=2 do for j in 0..=2 do for k in 0..=2 {
-    //     if i != 1 || j != 1 || k != 1 {
-    //         free(chunks[i][j][k])
-    //     }
-    // }
+addLights :: proc (chunk: ^Chunk) {
+    // chunk := chunks[1][1][1]
+    // calcSides(chunks)
+    applyLight(chunk)
     chunk.level = .Final
-    return chunk
 }
 
 nuke :: proc() {
