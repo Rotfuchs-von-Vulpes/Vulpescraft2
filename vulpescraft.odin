@@ -55,7 +55,6 @@ ThreadWork :: struct {
 	reset: bool,
 }
 
-threadWork_chan: chan.Chan(ThreadWork)
 pos_chan: chan.Chan([3]i32)
 chunks_chan: chan.Chan(^world.Chunk)
 chunks_light_chan: chan.Chan([3][3][3]^world.Chunk)
@@ -124,10 +123,6 @@ reloadChunks :: proc(reset: bool) {
 		unordered_remove(&allChunks, idx)
 	}
 
-	chan.send(threadWork_chan, ThreadWork {
-		chunkPosition = playerCamera.chunk,
-	})
-
 	viewDist := world.VIEW_DISTANCE
 	viewSize := 2 * viewDist + 1
 	positions := [dynamic][3]i32{}
@@ -178,7 +173,6 @@ main :: proc() {
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
 	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
 	chunks_light_chan, err = chan.create_buffered(chan.Chan([3][3][3]^world.Chunk), 8 * 8, chunksAllocator)
-	threadWork_chan, err = chan.create_buffered(chan.Chan(ThreadWork), 8 * 8, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -526,7 +520,6 @@ main :: proc() {
 	}
 	
 	chan.close(pos_chan)
-	chan.close(threadWork_chan)
 	chan.close(chunks_chan)
 	chan.close(chunks_light_chan)
 	chan.close(meshes_chan)
