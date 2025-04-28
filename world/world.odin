@@ -36,10 +36,10 @@ Chunk :: struct {
 
 allChunks := make(map[iVec3]^Chunk)
 
-getNewChunk :: proc(chunk: ^Chunk, x, y, z: i32) {
+getNewChunk :: proc(chunk: ^Chunk, pos: iVec3) {
     chunk.level = .Empty
     chunk.opened = {}
-    chunk.pos = {x, y, z}
+    chunk.pos = pos
     chunk.isEmpty = true
     chunk.isFill = false
     chunk.remeshing = false
@@ -110,13 +110,12 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     seeSides(chunk)
 }
 
-eval :: proc(x, y, z: i32, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
-    pos := iVec3{x, y, z}
+eval :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
     chunk, empty, _ := util.map_force_get(tempMap, pos)
     if empty {
         chunk^ = new(Chunk)
-        getNewChunk(chunk^, x, y, z)
-        setBlocksChunk(chunk^, terrain.getHeightMap(x, z))
+        getNewChunk(chunk^, pos)
+        setBlocksChunk(chunk^, terrain.getHeightMap(pos.x, pos.z))
     }
     return chunk^
 }
@@ -175,7 +174,7 @@ genPoll :: proc(chunk: ^Chunk) -> [3][3][3]^Chunk {
                         setBlocksChunk(c, terrain.getHeightMap(chunk.pos.x, chunk.pos.z))
                     } else {
                         c = new(Chunk)
-                        getNewChunk(c, chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k))
+                        getNewChunk(c, chunk.pos + {i32(i), i32(j), i32(k)})
                         setBlocksChunk(c, terrain.getHeightMap(chunk.pos.x + i32(i), chunk.pos.z + i32(k)))
                     }
                     chunks[i + 1][j + 1][k + 1] = c

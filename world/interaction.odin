@@ -10,7 +10,7 @@ getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
         i32(math.floor(f32(pos.z) / 16)),
     }
 
-    chunk := eval(chunkPos.x, chunkPos.y, chunkPos.z, &allChunks)
+    chunk := eval(chunkPos, &allChunks)
 
     iPos: iVec3
     iPos.x = i32(math.floor(16 * math.fract(f32(pos.x) / 16)))
@@ -133,12 +133,12 @@ atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> []^Chunk {
     defer delete(chunks)
 
     for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-        c := eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &allChunks)
+        c := eval(chunk.pos + {i32(i), i32(j), i32(k)}, &allChunks)
         c.level = .Trees
         seeSides(c)
         ccs: [3][3][3]^Chunk
         for ii in -1..=1 do for jj in -1..=1 do for kk in -1..=1 {
-            cc := eval(c.pos.x + i32(ii), c.pos.y + i32(jj), c.pos.z + i32(kk), &allChunks)
+            cc := eval(c.pos + {i32(ii), i32(jj), i32(kk)}, &allChunks)
             ccs[ii + 1][jj + 1][kk + 1] = cc
         }
         calcSides(ccs)

@@ -73,7 +73,7 @@ generateChunkBlocks :: proc(^thread.Thread) {
 		chunk, first, _ := util.map_force_get(&world.allChunks, pos)
 		if first {
 			chunk ^= new(world.Chunk)
-			world.getNewChunk(chunk^, pos.x, pos.y, pos.z)
+			world.getNewChunk(chunk^, pos)
 		}
 		generateChunk(chunk^)
 	}
@@ -371,7 +371,7 @@ main :: proc() {
 						if chunk.isEmpty || chunk.isFill do continue
 						chunks: [3][3][3]^world.Chunk
 						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-							c := world.eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &world.allChunks)
+							c := world.eval(chunk.pos, &world.allChunks)
 							chunks[i + 1][j + 1][k + 1] = c
 						}
 						chan.send(chunks_light_chan, chunks)
@@ -386,7 +386,7 @@ main :: proc() {
 						if chunk.isEmpty || chunk.isFill do continue
 						chunks: [3][3][3]^world.Chunk
 						for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-							c := world.eval(chunk.pos.x + i32(i), chunk.pos.y + i32(j), chunk.pos.z + i32(k), &world.allChunks)
+							c := world.eval(chunk.pos, &world.allChunks)
 							chunks[i + 1][j + 1][k + 1] = c
 						}
 						chan.send(chunks_light_chan, chunks)
