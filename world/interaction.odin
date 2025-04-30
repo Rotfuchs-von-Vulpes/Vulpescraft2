@@ -2,6 +2,7 @@ package world
 
 import math "core:math/linalg"
 import "core:fmt"
+import "core:sync"
 
 getPosition :: proc(pos: iVec3) -> (^Chunk, iVec3) {
     chunkPos := iVec3{
@@ -59,7 +60,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
         }
 
         chunk, blockPos := getPosition(iPos)
-        blockID := chunk.primer[blockPos.x + 1][blockPos.y + 1][blockPos.z + 1].id
+        blockID := chunk.blocks[blockPos.x][blockPos.y][blockPos.z]
         if !isPLaceable(blockID) {
             pos = blockPos
             offset: iVec3 = {0, 0, 0}
@@ -71,7 +72,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
                     findBestAxis: {
                         if offset.x != 0 {
                             chunk2, posB := getPosition({iPos.x + offset.x, iPos.y, iPos.z})
-                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            b := chunk2.blocks[posB.x][posB.y][posB.z]
                             if isPLaceable(b) {
                                 if place do chunk = chunk2
                                 if place do pos = posB
@@ -83,7 +84,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
                         }
                         if offset.y != 0 {
                             chunk2, posB := getPosition({iPos.x, iPos.y + offset.y, iPos.z})
-                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            b := chunk2.blocks[posB.x][posB.y][posB.z]
                             if isPLaceable(b) {
                                 if place do chunk = chunk2
                                 if place do pos = posB
@@ -95,7 +96,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
                         }
                         if offset.x != 0 {
                             chunk2, posB := getPosition({iPos.x, iPos.y, iPos.z + offset.z})
-                            b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                            b := chunk2.blocks[posB.x][posB.y][posB.z]
                             if isPLaceable(b) {
                                 if place do chunk = chunk2
                                 if place do pos = posB
@@ -112,7 +113,7 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
 
             if !canPlaceAtSide {
                 chunk2, posB := getPosition(iPos + offset)
-                b := chunk2.primer[posB.x + 1][posB.y + 1][posB.z + 1].id
+                b := chunk2.blocks[posB.x][posB.y][posB.z]
                 canPlaceAtSide = isPLaceable(b)
                 if place do chunk = chunk2
                 if place do pos = posB
@@ -128,53 +129,44 @@ raycast :: proc(origin, direction: vec3, place: bool) -> (^Chunk, iVec3, bool) {
     return nil, pos, false
 }
 
-atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3) -> []^Chunk {
-    chunks: [dynamic]^Chunk
-    defer delete(chunks)
+atualizeChunks :: proc(chunk: ^Chunk, pos: iVec3, id: u16, lock: ^sync.RW_Mutex) -> [dynamic]^ChunkPrimer {
+    chunks: [dynamic]^ChunkPrimer = {}
 
-    cs: [3][3][3]^Chunk
+    // chunk.blocks[pos.x][pos.y][pos.z] = id
+    cs: [3][3][3]^ChunkPrimer
     for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
-        c := allChunks[chunk.pos + {i32(i), i32(j), i32(k)}]
+        c := evalPrimer(chunk.pos + {i32(i), i32(j), i32(k)}, lock)
         cs[i + 1][j + 1][k + 1] = c
-        if c != nil && (c.pos == chunk.pos || c.level == .Final) {
-            append(&chunks, c)
-        }
-        ccs: [3][3][3]^Chunk
-        for ii in -1..=1 do for jj in -1..=1 do for kk in -1..=1 {
-            cc := allChunks[c.pos + {i32(ii), i32(jj), i32(kk)}]
-            ccs[ii + 1][jj + 1][kk + 1] = cc
-        }
-        calcSides(ccs)
+        append(&chunks, c)
     }
-    seeSides(chunk)
-    calcSides(cs)
-    isFilled(chunk)
+    chunk.blocks[pos.x][pos.y][pos.z] = id
+    setBlockChunks(cs, pos, id)
 
-    return chunks[:]
+    return chunks
 }
 
-destroy :: proc(origin, direction: vec3) -> ([]^Chunk, bool) {
-    chunks: []^Chunk
+destroy :: proc(origin, direction: vec3, lock: ^sync.RW_Mutex) -> ([dynamic]^ChunkPrimer, bool) {
+    chunks: [dynamic]^ChunkPrimer
     chunk, pos, ok := raycast(origin, direction, false)
 
-    if !ok {return chunks, false}
-    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 0
-    chunk.isFill = false
+    if !ok {return {}, false}
+    // chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = 0
+    // chunk.isFill = false
 
-    chunks = atualizeChunks(chunk, pos)
+    chunks = atualizeChunks(chunk, pos, 0, lock)
 
     return chunks, true
 }
 
-place :: proc(origin, direction: vec3, block: u16) -> ([]^Chunk, bool) {
-    chunks: []^Chunk
+place :: proc(origin, direction: vec3, block: u16, lock: ^sync.RW_Mutex) -> ([dynamic]^ChunkPrimer, bool) {
+    chunks: [dynamic]^ChunkPrimer
     chunk, pos, ok := raycast(origin, direction, true)
 
-    if !ok {return chunks, false}
-    chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
-    chunk.isEmpty = false
+    if !ok {return {}, false}
+    // chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id = block
+    // chunk.isEmpty = false
     
-    chunks = atualizeChunks(chunk, pos)
+    chunks = atualizeChunks(chunk, pos, block, lock)
 
     return chunks, true
 }

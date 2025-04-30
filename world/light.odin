@@ -8,7 +8,7 @@ Light :: struct{
     value: u8,
 }
 
-applyLight :: proc (chunk: ^Chunk) {
+applyLight :: proc (chunk: ^ChunkPrimer) -> ^ChunkData {
     emissiveCache := [dynamic]Light{}
     defer delete(emissiveCache)
     sunlightCache := [dynamic]Light{}
@@ -19,7 +19,7 @@ applyLight :: proc (chunk: ^Chunk) {
 
     for i in -1..=1 do for j in -1..=1 do for k in -1..=1 {
         for x in 0..<16 do for y in 0..<16 do for z in 0..<16 {
-            data := chunk.lightData[(i + 1) * 16 + x][(j + 1) * 16 + y][(k + 1) * 16 + z]
+            data := chunk.light[(i + 1) * 16 + x][(j + 1) * 16 + y][(k + 1) * 16 + z]
             pos := iVec3{i32((i + 1) * 16 + x), i32((j + 1) * 16 + y), i32((k + 1) * 16 + z)}
                 
             visited[pos.x][pos.y][pos.z] = {data.solid, data.solid}
@@ -113,9 +113,13 @@ applyLight :: proc (chunk: ^Chunk) {
         }
     }
 
+    data := new(ChunkData)
+    data.pos = chunk.pos
+
     for x in -1..<17 do for y in -1..<17 do for z in -1..<17 {
-        chunk.primer[x + 1][y + 1][z + 1].light = lightCopy[x + 16][y + 16][z + 16]
+        data.primer[x + 1][y + 1][z + 1].id = chunk.primer[x + 1][y + 1][z + 1]
+        data.primer[x + 1][y + 1][z + 1].light = lightCopy[x + 16][y + 16][z + 16]
     }
 
-    chunk.level = .ExternalLight
+    return data
 }

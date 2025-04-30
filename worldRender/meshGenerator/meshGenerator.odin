@@ -71,12 +71,12 @@ toVec3 :: proc(vec: iVec3) -> vec3 {
     return vec3{f32(vec.x), f32(vec.y), f32(vec.z)}
 }
 
-isSideExposed :: proc(chunk: ^world.Chunk, pos: iVec3, offset: iVec3) -> bool {
-    id := chunk.primer[pos.x + offset.x + 1][pos.y + offset.y + 1][pos.z + offset.z + 1].id
-    return id == 0 || id == 7 || id == 8 && chunk.primer[pos.x + 1][pos.y + 1][pos.z + 1].id != 8;
+isSideExposed :: proc(chunk: ^world.Primer, pos: iVec3, offset: iVec3) -> bool {
+    id := chunk[pos.x + offset.x + 1][pos.y + offset.y + 1][pos.z + offset.z + 1].id
+    return id == 0 || id == 7 || id == 8 && chunk[pos.x + 1][pos.y + 1][pos.z + 1].id != 8;
 }
 
-hasSideExposed :: proc(chunk: ^world.Chunk, pos: iVec3) -> bool {
+hasSideExposed :: proc(chunk: ^world.Primer, pos: iVec3) -> bool {
     if isSideExposed(chunk, pos, {-1, 0, 0}) {return true}
     if isSideExposed(chunk, pos, { 1, 0, 0}) {return true}
     if isSideExposed(chunk, pos, { 0,-1, 0}) {return true}
@@ -87,14 +87,14 @@ hasSideExposed :: proc(chunk: ^world.Chunk, pos: iVec3) -> bool {
     return false
 }
 
-filterCubes :: proc(chunk: ^world.Chunk) -> [dynamic]Cube {
+filterCubes :: proc(chunk: ^world.Primer) -> [dynamic]Cube {
     filtered := [dynamic]Cube{}
 
     for i: i32 = 0; i < 16; i += 1 {
         for j: i32 = 0; j < 16; j += 1 {
             for k: i32 = 0; k < 16; k += 1 {
                 pos: iVec3 = {i, j, k}
-                id := chunk.primer[i + 1][j + 1][k + 1].id
+                id := chunk[i + 1][j + 1][k + 1].id
 
                 if id == 0 {continue}
 
@@ -106,7 +106,7 @@ filterCubes :: proc(chunk: ^world.Chunk) -> [dynamic]Cube {
     return filtered
 }
 
-makeCubes :: proc(chunk: ^world.Chunk, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
+makeCubes :: proc(chunk: ^world.Primer, cubes: [dynamic]Cube) -> [dynamic]CubeFaces {
     cubesFaces := [dynamic]CubeFaces{}
 
     for cube in cubes {
@@ -186,7 +186,7 @@ getBlockPos :: proc(primers: Primers, pos: iVec3) -> (^^world.Chunk, iVec3, bool
     return primers[chunkXOffset + 1][chunkYOffset + 1][chunkZOffset + 1], finalPos, true
 }
 
-getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, chunk: ^world.Chunk) -> [2]f32 {
+getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, chunk: ^world.Primer) -> [2]f32 {
     normal: iVec3
 
     switch direction {
@@ -223,12 +223,12 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, chunk: ^world.
     cornerPos := posV + {signX, signY, signZ}
     side1Pos2 := side1Pos
     side2Pos2 := side2Pos
-    corner := chunk.primer[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1]
-    side1 := chunk.primer[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1]
-    side2 := chunk.primer[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1]
+    corner := chunk[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1]
+    side1 := chunk[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1]
+    side2 := chunk[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1]
 
     normalPos := posV + normal
-    light := chunk.primer[normalPos.x + 1][normalPos.y + 1][normalPos.z + 1].light
+    light := chunk[normalPos.x + 1][normalPos.y + 1][normalPos.z + 1].light
     blockLight := f32(light.x)
     sunLight := f32(light.y)
     if side1.id == 0 || side1.id == 9 {
@@ -246,7 +246,7 @@ getLight :: proc(pos: iVec3, offset: iVec3, direction: Direction, chunk: ^world.
     return {f32(blockLight), f32(sunLight)}
 }
 
-getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, chunk: ^world.Chunk) -> f32 {
+getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, chunk: ^world.Primer) -> f32 {
     normal: iVec3
 
     switch direction {
@@ -283,9 +283,9 @@ getAO :: proc(pos: iVec3, offset: vec3, direction: Direction, chunk: ^world.Chun
     cornerPos := posV + {signX, signY, signZ}
     side1Pos2 := side1Pos
     side2Pos2 := side2Pos
-    corner := chunk.primer[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1].id
-    side1 := chunk.primer[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1].id
-    side2 := chunk.primer[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1].id
+    corner := chunk[cornerPos.x + 1][cornerPos.y + 1][cornerPos.z + 1].id
+    side1 := chunk[side1Pos2.x + 1][side1Pos2.y + 1][side1Pos2.z + 1].id
+    side2 := chunk[side2Pos2.x + 1][side2Pos2.y + 1][side2Pos2.z + 1].id
 
     if corner == 8 {corner = 0}
     if side1 == 8 {side1 = 0}
@@ -307,7 +307,7 @@ makeCorners :: proc(topLeft, bottomLeft, bottomRight, topRight: Point) -> [Corne
     }
 }
 
-getFacePoints :: proc(cube: CubeFacesPoints, chunk: ^world.Chunk, direction: Direction) -> [Corner]Point {
+getFacePoints :: proc(cube: CubeFacesPoints, chunk: ^world.Primer, direction: Direction) -> [Corner]Point {
     pointByVertex := [Position]Point{}
 
     if .SouthwestDown in cube.points {
@@ -368,7 +368,7 @@ getTextureID :: proc(dir: Direction, id: u32) -> f32 {
     return 0
 }
 
-makePoinsAndFaces :: proc(cubesPoints: [dynamic]CubeFacesPoints, chunk: ^world.Chunk) -> [dynamic]Face {
+makePoinsAndFaces :: proc(cubesPoints: [dynamic]CubeFacesPoints, chunk: ^world.Primer) -> [dynamic]Face {
     faces := [dynamic]Face{}
 
     for cube in cubesPoints {
@@ -468,7 +468,7 @@ makeVertices :: proc(faces: [dynamic]Face) -> (Mesh, Mesh) {
     return {blockVertices, blockIndices, i32(len(blockIndices))}, {waterVertices, waterIndices, i32(len(waterIndices))}
 }
 
-generateMesh :: proc(chunk: ^world.Chunk) -> ChunkData {
+generateMesh :: proc(pos: iVec3, chunk: ^world.Primer) -> ChunkData {
     cubes := filterCubes(chunk)
     cubesFaces := makeCubes(chunk, cubes)
     delete(cubes)
@@ -479,5 +479,5 @@ generateMesh :: proc(chunk: ^world.Chunk) -> ChunkData {
     blocks, water := makeVertices(faces)
     delete(faces)
 
-    return {chunk.pos, blocks, water}
+    return {pos, blocks, water}
 }

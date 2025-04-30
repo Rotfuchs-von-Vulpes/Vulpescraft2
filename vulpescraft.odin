@@ -5,6 +5,7 @@ import "core:strings"
 import "core:time"
 import "core:mem"
 import "core:thread"
+import "core:sync"
 import "core:sync/chan"
 import "core:slice"
 import math "core:math/linalg"
@@ -25,6 +26,8 @@ import "hud"
 
 import "tracy"
 
+iVec3 :: [3]i32
+
 screenWidth: i32 = 854
 screenHeight: i32 = 480
 
@@ -42,6 +45,8 @@ chunks: [dynamic]worldRender.ChunkBuffer
 allChunks: [dynamic]worldRender.ChunkBuffer
 toRemashing: [dynamic][3]i32
 
+primersLock: sync.RW_Mutex
+
 cameraSetup :: proc() {
 	playerCamera.proj = math.matrix4_infinite_perspective_f32(45, playerCamera.viewPort.x / playerCamera.viewPort.y, 0.1)
 }
@@ -55,38 +60,59 @@ ThreadWork :: struct {
 	reset: bool,
 }
 
-pos_chan: chan.Chan(^world.Chunk)
-chunks_chan: chan.Chan(^world.Chunk)
-chunks_light_chan: chan.Chan(^world.Chunk)
-meshes_chan: chan.Chan(mesh.ChunkData)
-
-generateChunk :: proc(chunk: ^world.Chunk) {
-	world.genPoll(chunk)
-	if !chunk.isEmpty && !chunk.isFill do chan.send(chunks_light_chan, chunk)
+ChunkData :: struct {
+	pos: iVec3,
+	primer: world.Primer,
+	light: world.LightPrimer,
 }
 
+ChunkBlocks :: struct {
+	pos: iVec3,
+	primer: world.Primer,
+}
+
+pos_chan: chan.Chan(^world.Chunk)
+chunks_chan: chan.Chan(^world.ChunkData)
+chunks_light_chan: chan.Chan(^world.ChunkPrimer)
+// lightData_chan: chan.Chan(^world.LightData)
+// final_chan: chan.Chan(^world.Chunk)
+meshes_chan: chan.Chan(mesh.ChunkData)
+
 generateChunkBlocks :: proc(^thread.Thread) {
+	context = runtime.default_context()
+	context.allocator = mem.tracking_allocator(tracking_allocator)
+
 	for !chan.is_closed(pos_chan) {
 		chunk, ok := chan.recv(pos_chan)
 		if !ok do continue
-		generateChunk(chunk)
+		data := world.genPoll(chunk, &primersLock)
+		chan.send(chunks_light_chan, data)
+		// world.allChunks[pos] = ptr
 	}
 }
 
 iluminateChunk :: proc (^thread.Thread) {
+	context = runtime.default_context()
+	context.allocator = mem.tracking_allocator(tracking_allocator)
+
 	for !chan.is_closed(chunks_light_chan) {
 		chunk, ok := chan.recv(chunks_light_chan)
 		if !ok do continue 
-		world.addLights(chunk)
-		chan.send(chunks_chan, chunk)
+		resp := world.applyLight(chunk)
+		chan.send(chunks_chan, resp)
 	}
 }
 
 generateChunkMesh :: proc(^thread.Thread) {
+	context = runtime.default_context()
+	context.allocator = mem.tracking_allocator(tracking_allocator)
+
 	for !chan.is_closed(chunks_chan) {
 		chunk, ok := chan.recv(chunks_chan)
-		if !ok do continue 
-		chan.send(meshes_chan, worldRender.eval(chunk))
+		if !ok do continue
+		//chan.send(final_chan, chunk)
+		chan.send(meshes_chan, mesh.generateMesh(chunk.pos, &chunk.primer))
+		free(chunk)
 	}
 }
 
@@ -99,6 +125,7 @@ less_dist :: proc (a, b: [3]i32) -> bool {
 }
 
 reloadChunks :: proc(reset: bool) {
+	context = runtime.default_context()
 	toReload = false
 
 	buffer := [dynamic]int{}
@@ -133,7 +160,8 @@ reloadChunks :: proc(reset: bool) {
 		p := pos + playerCamera.chunk
 		if !history[p] {
 			chunk := new(world.Chunk)
-			world.getNewChunk(chunk, p)
+			// world.getNewChunk(chunk, p)
+			chunk.pos = p
 			world.allChunks[p] = chunk
 			chan.send(pos_chan, chunk)
 		}
@@ -151,10 +179,12 @@ lastChunkZ := playerCamera.chunk.z
 last: time.Tick
 cameraSpeed: f32 = 0.0125
 
+tracking_allocator: ^mem.Tracking_Allocator
+
 main :: proc() {
 	context = runtime.default_context()
 
-	tracking_allocator := new(mem.Tracking_Allocator)
+	tracking_allocator = new(mem.Tracking_Allocator)
 	defer free(tracking_allocator)
 	mem.tracking_allocator_init(tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(tracking_allocator)
@@ -165,8 +195,8 @@ main :: proc() {
 	err: runtime.Allocator_Error
 	pos_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 2000000, chunksAllocator)
 	meshes_chan, err = chan.create_buffered(chan.Chan(mesh.ChunkData), 8 * 8, chunksAllocator)
-	chunks_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
-	chunks_light_chan, err = chan.create_buffered(chan.Chan(^world.Chunk), 8 * 8, chunksAllocator)
+	chunks_chan, err = chan.create_buffered(chan.Chan(^world.ChunkData), 8 * 8, chunksAllocator)
+	chunks_light_chan, err = chan.create_buffered(chan.Chan(^world.ChunkPrimer), 2000000, chunksAllocator)
 	
 	start_tick := time.tick_now()
 
@@ -297,18 +327,18 @@ main :: proc() {
 						toLeft = true
 					case .D:
 						toRight = true
-					case .Q:
-						c := world.allChunks[playerCamera.chunk]
-						oponed := c.opened
-						str := "Opened sides: "
-						if .Up in oponed do str = fmt.tprintf("%s, Up", str)
-						if .Bottom in oponed do str = fmt.tprintf("%s, Bottom", str)
-						if .North in oponed do str = fmt.tprintf("%s, North", str)
-						if .South in oponed do str = fmt.tprintf("%s, South", str)
-						if .West in oponed do str = fmt.tprintf("%s, West", str)
-						if .East in oponed do str = fmt.tprintf("%s, East", str)
-						fmt.printfln(str)
-						fmt.printfln("%d", c.level)
+					// case .Q:
+					// 	c := world.allChunks[playerCamera.chunk]
+					// 	oponed := c.opened
+					// 	str := "Opened sides: "
+					// 	if .Up in oponed do str = fmt.tprintf("%s, Up", str)
+					// 	if .Bottom in oponed do str = fmt.tprintf("%s, Bottom", str)
+					// 	if .North in oponed do str = fmt.tprintf("%s, North", str)
+					// 	if .South in oponed do str = fmt.tprintf("%s, South", str)
+					// 	if .West in oponed do str = fmt.tprintf("%s, West", str)
+					// 	if .East in oponed do str = fmt.tprintf("%s, East", str)
+					// 	fmt.printfln(str)
+					// 	fmt.printfln("%d", c.level)
 				}
 			} else if looking && event.type == .MOUSEMOTION {
 				xpos :=  f32(event.motion.xrel)
@@ -361,25 +391,13 @@ main :: proc() {
 				}
 			} else if event.type == .MOUSEBUTTONDOWN {
 				if event.button.button == 1 {
-					chunksToUpdate, ok := world.destroy(playerCamera.pos, playerCamera.front)
-					for chunk in chunksToUpdate {
-						if chunk.isEmpty || chunk.isFill do continue
-						chan.send(chunks_light_chan, chunk)
-					}
-					if ok {
-						worldRender.destroy(chunksToUpdate)
-						reloadChunks(true)
-					}
+					chunksToUpdate, ok := world.destroy(playerCamera.pos, playerCamera.front, &primersLock)
+					for chunk, idx in chunksToUpdate do chan.send(chunks_light_chan, chunk)
+					delete(chunksToUpdate)
 				} else if event.button.button == 3 {
-					chunksToUpdate, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1)
-					for chunk in chunksToUpdate {
-						if chunk.isEmpty || chunk.isFill do continue
-						chan.send(chunks_light_chan, chunk)
-					}
-					if ok {
-						worldRender.destroy(chunksToUpdate)
-						reloadChunks(true)
-					}
+					chunksToUpdate, ok := world.place(playerCamera.pos, playerCamera.front, u16(index) + 1, &primersLock)
+					for &chunk in chunksToUpdate do chan.send(chunks_light_chan, chunk)
+					delete(chunksToUpdate)
 				}
 			} else if event.type == .MOUSEWHEEL {
 				if event.wheel.y < 0 {
@@ -456,7 +474,7 @@ main :: proc() {
 						unordered_remove(&allChunks, idx)
 					}
 				}
-				append(&allChunks, worldRender.setup(chunk))
+				append(&allChunks, worldRender.setupChunk(chunk))
 			}
 
 			if done {
@@ -502,6 +520,18 @@ main :: proc() {
 			// fmt.printfln("%d", chan.len(pos_chan))
 		}
 		sdl2.SetWindowTitle(window, strings.unsafe_string_to_cstring(fmt.tprintfln("FPS: %d", fps)))
+	}
+
+	for {
+		data, ok := chan.try_recv(chunks_chan)
+		if !ok do break
+		fmt.printfln("a")
+		free(data)
+	}
+	for {
+		data, ok := chan.try_recv(chunks_light_chan)
+		if !ok do break
+		free(data)
 	}
 	
 	chan.close(pos_chan)

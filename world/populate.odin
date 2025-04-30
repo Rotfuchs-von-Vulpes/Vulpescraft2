@@ -6,7 +6,7 @@ import "core:fmt"
 import "base:runtime"
 import "../skeewb"
 
-setBlock :: proc(x, y, z: i32, id: u16, chunks: [3][3][3]^Chunk) {
+setPopulateBlock :: proc(x, y, z: i32, id: u16, chunks: [3][3][3]^Chunk) {
     x := x; y := y; z := z
     c := chunks[1][1][1]
     ox, oy, oz: i32 = 0, 0, 0
@@ -40,18 +40,18 @@ setBlock :: proc(x, y, z: i32, id: u16, chunks: [3][3][3]^Chunk) {
 
     c = chunks[ox + 1][oy + 1][oz + 1]
 
-    c.isEmpty = false
-    c.primer[x + 1][y + 1][z + 1].id = id
+    // c.isEmpty = false
+    c.blocks[x][y][z] = id
 }
 
 placeTree :: proc(x, y, z: i32, chunks: [3][3][3]^Chunk, rnd: f32) {
-    setBlock(x, y, z, 2, chunks)
+    setPopulateBlock(x, y, z, 2, chunks)
 
     for i := y + 1; i <= y + 5; i += 1 { 
         if i - y == 2 && rnd <= 2 {
-            setBlock(x, i, z, 9, chunks)
+            setPopulateBlock(x, i, z, 9, chunks)
         } else {
-            setBlock(x, i, z, 6, chunks)
+            setPopulateBlock(x, i, z, 6, chunks)
         }
     }
 
@@ -65,7 +65,7 @@ placeTree :: proc(x, y, z: i32, chunks: [3][3][3]^Chunk, rnd: f32) {
 
                 if xx && zz || i == x && j == z {continue}
 
-                setBlock(i, k, j, leaves, chunks);
+                setPopulateBlock(i, k, j, leaves, chunks);
             }
         }
     }
@@ -78,7 +78,7 @@ placeTree :: proc(x, y, z: i32, chunks: [3][3][3]^Chunk, rnd: f32) {
 
                 if xx && zz || k == y + 5 && i == x && j == z {continue}
 
-                setBlock(i, k, j, leaves, chunks);
+                setPopulateBlock(i, k, j, leaves, chunks);
             }
         }
     }
@@ -100,12 +100,12 @@ populate :: proc (chunks: [3][3][3]^Chunk) {
             
             toPlace := false
             y0 := 0
-            if j == 0 && chunks[i + 1][j][k + 1].primer[x0 + 1][15][z0 + 1].id == 3 {
+            if j == 0 && chunks[i + 1][j][k + 1].blocks[x0][15][z0] == 3 {
                 toPlace = true
             } else {
                 for h in 0..<16 {
                     y0 = h
-                    if chunk.primer[x0 + 1][y0 + 1][z0 + 1].id == 3 {
+                    if chunk.blocks[x0][y0][z0]== 3 {
                         toPlace = true
                         break
                     }
@@ -118,5 +118,5 @@ populate :: proc (chunks: [3][3][3]^Chunk) {
         }
     }
 
-    chunks[1][1][1].level = .Trees
+    // chunks[1][1][1].level = .Trees
 }
