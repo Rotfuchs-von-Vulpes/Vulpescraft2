@@ -164,8 +164,8 @@ reloadChunks :: proc(reset: bool) {
 			chunk.pos = p
 			world.allChunks[p] = chunk
 			chan.send(pos_chan, chunk)
+			history[p] = true
 		}
-		history[p] = true
 	}
 }
 
