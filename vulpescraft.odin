@@ -313,7 +313,7 @@ main :: proc() {
 						toDebug = !toDebug
 					case .E:
 						looking = !looking
-						if looking do sdl2.SetRelativeMouseMode(true); else do sdl2.SetRelativeMouseMode(false)
+						sdl2.SetRelativeMouseMode(looking ? true : false)
 				}
 			} else if event.type == .KEYDOWN {
 				#partial switch (event.key.keysym.sym) {
