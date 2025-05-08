@@ -285,7 +285,7 @@ main :: proc() {
 	thread.start(meshGenereatorThread)
 	reloadChunks(false)
 
-	looking := true
+	looking: sdl2.bool = true
 
 	index := 0
 
@@ -313,7 +313,7 @@ main :: proc() {
 						toDebug = !toDebug
 					case .E:
 						looking = !looking
-						sdl2.SetRelativeMouseMode(looking ? true : false)
+						sdl2.SetRelativeMouseMode(looking)
 				}
 			} else if event.type == .KEYDOWN {
 				#partial switch (event.key.keysym.sym) {
