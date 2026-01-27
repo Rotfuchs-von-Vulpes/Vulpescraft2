@@ -1,11 +1,5 @@
 package world
 
-import "../skeewb"
-import "core:math"
-import "core:math/rand"
-import "core:time"
-import "core:fmt"
-import "core:mem/virtual"
 import "core:sync"
 import "../util"
 import "terrain"
@@ -29,17 +23,6 @@ LightData :: struct {
 }
 LightPrimer :: [3 * 16][3 * 16][3 * 16]LightData
 
-// Chunk :: struct {
-//     pos: iVec3,
-//     primer: Primer,
-//     lightData: LightPrimer,
-//     opened: FaceSet,
-//     level: GeneratePhase,
-//     isEmpty: bool,
-//     isFill: bool,
-//     remeshing: bool,
-// }
-
 Chunk :: struct {
     pos: iVec3,
     blocks: [16][16][16]u16,
@@ -61,41 +44,15 @@ FaceSet :: bit_set[Direction]
 
 GeneratePhase :: enum {Empty, Blocks, Trees, InternalLight, SidesClone, ExternalLight, Final}
 
-allChunks := make(map[iVec3]^Chunk)
-allChunksPrimers := make(map[iVec3]^ChunkPrimer)
+allChunks : map[iVec3]^Chunk
+allChunksPrimers : map[iVec3]^ChunkPrimer
+history : map[iVec3]bool
 
-// getNewChunk :: proc(chunk: ^Chunk, pos: iVec3) {
-//     chunk.level = .Empty
-//     chunk.opened = {}
-//     chunk.pos = pos
-//     chunk.isEmpty = true
-//     chunk.isFill = false
-//     chunk.remeshing = false
-// }
-
-// seeSides :: proc(chunk: ^Chunk) {
-//     chunk.opened = {}
-//     for i in 0..<16 do for j in 0..<16 {
-//         if chunk.primer[i + 1][j + 1][ 1].id == 0 do chunk.opened += {.South}
-//         if chunk.primer[i + 1][j + 1][16].id == 0 do chunk.opened += {.North}
-//         if chunk.primer[i + 1][ 1][j + 1].id == 0 do chunk.opened += {.Bottom}
-//         if chunk.primer[i + 1][16][j + 1].id == 0 do chunk.opened += {.Up}
-//         if chunk.primer[ 1][i + 1][j + 1].id == 0 do chunk.opened += {.West}
-//         if chunk.primer[16][i + 1][j + 1].id == 0 do chunk.opened += {.East}
-//     }
-// }
-
-// isFilled :: proc(chunk: ^Chunk) {
-//     for i in 0..<18 do for j in 0..<18 do for k in 0..<18 {
-//         id := chunk.primer[i][j][k].id
-//         if isPLaceable(id) {
-//             chunk.isFill = false
-//             return 
-//         }
-//     }
-
-//     chunk.isFill = true
-// }
+init :: proc () {
+    allChunks = make(map[iVec3]^Chunk)
+    allChunksPrimers = make(map[iVec3]^ChunkPrimer)
+    history = make(map[iVec3]bool)
+}
 
 setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
     empty := true
@@ -131,10 +88,6 @@ setBlocksChunk :: proc(chunk: ^Chunk, heightMap: terrain.HeightMap) {
             }
         }
     }
-
-    // chunk.isEmpty = empty
-    // chunk.level = .Blocks
-    // seeSides(chunk)
 }
 
 eval :: proc(pos: iVec3, tempMap: ^map[iVec3]^Chunk) -> ^Chunk {
@@ -171,7 +124,6 @@ sqDist :: proc(pos1, pos2: iVec3, dist: int) -> bool {
     return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z < i32(dist * dist)
 }
 
-history := make(map[iVec3]bool)
 genStack := [dynamic]iVec3{}
 
 setBlock :: proc (chunk: ^ChunkPrimer, idx: iVec3, id: u16) {

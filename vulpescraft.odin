@@ -118,7 +118,7 @@ generateChunkMesh :: proc(^thread.Thread) {
 
 toReload := false
 
-history := make(map[[3]i32]bool)
+history : map[[3]i32]bool
 
 less_dist :: proc (a, b: [3]i32) -> bool {
 	return a.x*a.x + a.y*a.y + a.z*a.z < b.x*b.x + b.y*b.y + b.z*b.z
@@ -190,6 +190,8 @@ main :: proc() {
 	context.allocator = mem.tracking_allocator(tracking_allocator)
 
 	// tracy.Zone()
+
+	history = make(map[[3]i32]bool)
 
 	chunksAllocator := runtime.heap_allocator()
 	err: runtime.Allocator_Error

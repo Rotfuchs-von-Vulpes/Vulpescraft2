@@ -1,16 +1,10 @@
 package worldRender
 
 import gl "vendor:OpenGL"
-import "vendor:sdl2"
-import stb "vendor:stb/image"
-import "core:strings"
 import glm "core:math/linalg/glsl"
-import math "core:math/linalg"
 
-import "../skeewb"
 import "../world"
 import "../util"
-import "../sky"
 import mesh "meshGenerator"
 
 iVec3 :: [3]i32
@@ -40,8 +34,13 @@ Render :: struct{
 	texture: u32,
 }
 
-chunkMap := make(map[iVec3]ChunkBuffer)
-dataChunks := make(map[iVec3]mesh.ChunkData)
+chunkMap : map[iVec3]ChunkBuffer
+dataChunks : map[iVec3]mesh.ChunkData
+
+init :: proc () {
+	chunkMap = make(map[iVec3]ChunkBuffer)
+	dataChunks = make(map[iVec3]mesh.ChunkData)
+}
 
 setupChunk :: proc(data: mesh.ChunkData) -> ChunkBuffer {
 	blocksBuffer := setupBlocks(data)
